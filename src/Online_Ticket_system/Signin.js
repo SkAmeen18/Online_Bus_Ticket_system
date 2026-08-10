@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 
 export default function Signin({ onLoginSuccess }) {
-  const [role, setRole] = useState('user'); // 'user' (Passenger) or 'admin'
-  const [mode, setMode] = useState('signin'); // 'signin', 'signup', or 'forgot'
+  const [role, setRole] = useState('user');
+  const [mode, setMode] = useState('signin');
 
   const initialFormState = {
     name: '',
@@ -32,10 +32,8 @@ export default function Signin({ onLoginSuccess }) {
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Base API URL pointing to your live Render Express backend server
   const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
 
-  // Clears all form fields completely
   const resetForm = () => {
     setFormData(initialFormState);
     setError('');
@@ -43,7 +41,6 @@ export default function Signin({ onLoginSuccess }) {
     setShowPassword(false);
   };
 
-  // Ensure form is reset on component mount
   useEffect(() => {
     resetForm();
   }, []);
@@ -81,7 +78,6 @@ export default function Signin({ onLoginSuccess }) {
     setError('');
     setSuccessMsg('');
 
-    // 1. FORGOT PASSWORD MODE
     if (mode === 'forgot') {
       if (!formData.emailOrPhone) {
         setError('Please enter your Mobile Number or Email Address.');
@@ -91,7 +87,6 @@ export default function Signin({ onLoginSuccess }) {
       return;
     }
 
-    // 2. SIGN UP MODE
     if (mode === 'signup') {
       if (!formData.name || !formData.emailOrPhone || !formData.password || !formData.confirmPassword) {
         setError('Please fill in all required registration fields.');
@@ -117,7 +112,7 @@ export default function Signin({ onLoginSuccess }) {
             email: formData.emailOrPhone,
             phone: formData.phone,
             password: formData.password,
-            role: role, // 'user' or 'admin'
+            role: role,
           }),
         });
 
@@ -131,7 +126,6 @@ export default function Signin({ onLoginSuccess }) {
           throw new Error(data.message || `Registration failed with status ${response.status}`);
         }
 
-        // Save local backup
         saveUserToLocalStorage(
           data.user || {
             id: (role === 'admin' ? 'ADM-' : 'USR-') + Math.floor(1000 + Math.random() * 9000),
@@ -139,7 +133,7 @@ export default function Signin({ onLoginSuccess }) {
             email: formData.emailOrPhone,
             phone: formData.phone,
             password: formData.password,
-            role: role === 'admin' ? 'admin' : 'Passenger',
+            role: role === 'admin' ? 'admin' : 'user',
             joined: new Date().toISOString().split('T')[0],
             status: 'Active'
           }
@@ -157,7 +151,6 @@ export default function Signin({ onLoginSuccess }) {
       return;
     }
 
-    // 3. SIGN IN MODE
     if (mode === 'signin') {
       if (!formData.emailOrPhone || !formData.password) {
         setError('Please enter your Email/Phone and Password.');
@@ -189,7 +182,6 @@ export default function Signin({ onLoginSuccess }) {
         const authenticatedUser = data.user;
         const normalizedUserRole = (authenticatedUser.role || '').toLowerCase();
 
-        // Strict Role Check Enforcement
         if (role === 'admin' && normalizedUserRole !== 'admin') {
           throw new Error('Access denied. Regular passenger accounts cannot access the Admin Portal.');
         }
@@ -198,7 +190,6 @@ export default function Signin({ onLoginSuccess }) {
           throw new Error('Access denied. Admin accounts must sign in using the Admin Portal.');
         }
 
-        // Store authenticated session
         localStorage.setItem('currentUser', JSON.stringify(authenticatedUser));
 
         if (onLoginSuccess) {
@@ -216,7 +207,6 @@ export default function Signin({ onLoginSuccess }) {
     <div style={styles.pageContainer}>
       <div style={styles.authWrapper}>
 
-        {/* LEFT PANEL */}
         <div style={styles.leftSection}>
           <div style={styles.brandGroup}>
             <div style={styles.logoBadge}>
@@ -255,10 +245,7 @@ export default function Signin({ onLoginSuccess }) {
           </div>
         </div>
 
-        {/* RIGHT PANEL */}
         <div style={styles.rightSection}>
-          
-          {/* Role Toggle */}
           <div style={styles.roleToggle}>
             <button
               type="button"
@@ -276,7 +263,6 @@ export default function Signin({ onLoginSuccess }) {
             </button>
           </div>
 
-          {/* Form Header */}
           <div style={styles.formHeader}>
             <h2 style={styles.formTitle}>
               {mode === 'forgot' && 'Reset Password'}
@@ -290,14 +276,10 @@ export default function Signin({ onLoginSuccess }) {
             </p>
           </div>
 
-          {/* Alert Messages */}
           {error && <div style={styles.errorAlert}>{error}</div>}
           {successMsg && <div style={styles.successAlert}>{successMsg}</div>}
 
-          {/* Input Form */}
           <form onSubmit={handleSubmit} style={styles.form}>
-
-            {/* Full Name (Sign Up Only) */}
             {mode === 'signup' && (
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Full Name</label>
@@ -316,7 +298,6 @@ export default function Signin({ onLoginSuccess }) {
               </div>
             )}
 
-            {/* Email / Mobile Field */}
             <div style={styles.inputGroup}>
               <label style={styles.label}>
                 {mode === 'signup' ? 'Email Address' : 'Mobile Number or Email'}
@@ -342,7 +323,6 @@ export default function Signin({ onLoginSuccess }) {
               </div>
             </div>
 
-            {/* Mobile Field (Sign Up Only) */}
             {mode === 'signup' && (
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Mobile Number</label>
@@ -361,7 +341,6 @@ export default function Signin({ onLoginSuccess }) {
               </div>
             )}
 
-            {/* Password Field */}
             {mode !== 'forgot' && (
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Password</label>
@@ -386,7 +365,6 @@ export default function Signin({ onLoginSuccess }) {
                   </button>
                 </div>
 
-                {/* Forgot Password Link */}
                 {mode === 'signin' && (
                   <div style={styles.forgotRow}>
                     <button
@@ -401,7 +379,6 @@ export default function Signin({ onLoginSuccess }) {
               </div>
             )}
 
-            {/* Confirm Password (Sign Up Only) */}
             {mode === 'signup' && (
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Confirm Password</label>
@@ -420,7 +397,6 @@ export default function Signin({ onLoginSuccess }) {
               </div>
             )}
 
-            {/* Submit Button */}
             <button type="submit" style={styles.submitBtn} disabled={loading}>
               {loading ? (
                 <span>Processing...</span>
@@ -446,7 +422,6 @@ export default function Signin({ onLoginSuccess }) {
             </button>
           </form>
 
-          {/* Mode Switching Links */}
           <div style={styles.switchContainer}>
             {mode === 'forgot' ? (
               <button

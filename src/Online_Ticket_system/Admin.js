@@ -34,6 +34,8 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
+const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
+
 const BANGLADESH_DISTRICTS = [
   'Bagerhat', 'Bandarban', 'Barguna', 'Barishal', 'Bhola', 'Bogra', 'Brahmanbaria', 'Chandpur',
   'Chittagong', 'Chuadanga', 'Comilla', 'Cox\'s Bazar', 'Dhaka', 'Dinajpur', 'Faridpur', 'Feni',
@@ -65,7 +67,7 @@ const INITIAL_FORM_STATE = {
   to: '',
   busType: '',
   fare: '',
-  seats: '',
+  seats: '36',
   arrivalTime: '',
   departureTime: '',
   estimatedHours: '',
@@ -77,9 +79,9 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     const saved = localStorage.getItem('admin_profile_data');
     if (saved) return JSON.parse(saved);
     return {
-      name: user?.name || '',
-      email: user?.emailOrPhone || '',
-      phone: user?.phone || ''
+      name: user?.name || 'Admin User',
+      email: user?.email || user?.emailOrPhone || 'admin@example.com',
+      phone: user?.phone || '+880 1700-000000'
     };
   });
 
@@ -102,7 +104,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     return localStorage.getItem(`avatar_${user?.emailOrPhone || 'admin'}`) || null;
   });
 
-  // Edit Info Modal States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({
     name: adminProfile.name,
@@ -115,7 +116,21 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   });
   const [editMsg, setEditMsg] = useState({ type: '', text: '' });
 
+  // Sync data with backend API & localStorage fallback
   useEffect(() => {
+    const fetchBuses = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/buses`);
+        if (res.ok) {
+          const data = await res.json();
+          setBuses(data);
+          localStorage.setItem('app_buses', JSON.stringify(data));
+        }
+      } catch (err) {
+        console.warn('Backend unavailable, using cached bus data.');
+      }
+    };
+
     const syncData = () => {
       const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
       const loadedTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
@@ -123,6 +138,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       setTicketSales(loadedTickets);
     };
 
+    fetchBuses();
     syncData();
     window.addEventListener('storage', syncData);
     return () => window.removeEventListener('storage', syncData);
@@ -252,10 +268,10 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
   const handleDeleteBus = (e, id) => {
     e.stopPropagation();
-    setBuses(buses.filter((bus) => bus.id !== id));
+    setBuses(buses.filter((bus) => bus.id !== id && bus._id !== id));
   };
 
-  const handleAddBusSubmit = (e) => {
+  const handleAddBusSubmit = async (e) => {
     e.preventDefault();
     if (!newBus.name || !newBus.busNumber || !newBus.fare || !newBus.from || !newBus.to || !newBus.busType) {
       alert('Please fill out all required route details!');
@@ -279,7 +295,22 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       images: newBus.images
     };
 
-    setBuses([...buses, createdBus]);
+    try {
+      const res = await fetch(`${API_BASE}/buses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createdBus)
+      });
+      if (res.ok) {
+        const savedBus = await res.json();
+        setBuses((prev) => [...prev, savedBus]);
+      } else {
+        setBuses((prev) => [...prev, createdBus]);
+      }
+    } catch (err) {
+      setBuses((prev) => [...prev, createdBus]);
+    }
+
     handleCloseModal();
   };
 
@@ -356,7 +387,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
               <div style={styles.routeGrid}>
                 {buses.map((bus) => (
                   <div
-                    key={bus.id}
+                    key={bus._id || bus.id}
                     style={styles.routeBox}
                     onClick={() => { setSelectedBusDetails(bus); setActiveImageIndex(0); }}
                   >
@@ -369,11 +400,11 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                           <span>No Image Attached</span>
                         </div>
                       )}
-                      <span style={styles.boxIdTag}>#{bus.id}</span>
+                      <span style={styles.boxIdTag}>#{bus.id || String(bus._id).slice(-4)}</span>
                       <button
                         style={styles.boxDeleteBtn}
                         title="Delete Route"
-                        onClick={(e) => handleDeleteBus(e, bus.id)}
+                        onClick={(e) => handleDeleteBus(e, bus._id || bus.id)}
                       >
                         <Trash2 size={15} />
                       </button>
@@ -550,7 +581,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                     {registeredUsers.map((u, index) => {
                       const serialId = `USR-${String(index + 1).padStart(3, '0')}`;
                       return (
-                        <tr key={u.id || index} style={styles.tr}>
+                        <tr key={u.id || u._id || index} style={styles.tr}>
                           <td style={styles.td}>
                             <span style={styles.userIdBadge}>#{serialId}</span>
                           </td>
@@ -566,7 +597,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                           <td style={styles.td}>{u.phone || '+880 17XXX-XXXXXX'}</td>
                           <td style={styles.td}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#a1a1aa' }}>
-                              <Calendar size={12} /> {u.joined || 'Recent'}
+                              <Calendar size={12} /> {u.joined ? String(u.joined).split('T')[0] : 'Recent'}
                             </span>
                           </td>
                           <td style={styles.td}>
@@ -876,7 +907,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                   {selectedBusDetails.name}
                 </h3>
                 <span style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>
-                  Coach No: {selectedBusDetails.busNumber || 'N/A'} | Route ID: #{selectedBusDetails.id}
+                  Coach No: {selectedBusDetails.busNumber || 'N/A'} | Route ID: #{selectedBusDetails.id || String(selectedBusDetails._id).slice(-4)}
                 </span>
               </div>
               <button style={styles.closeBtn} onClick={() => setSelectedBusDetails(null)}>
@@ -1091,7 +1122,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
                   <div style={styles.activityProfileCard}>
                     <span style={styles.actLabel}><Calendar size={12} /> Account Created</span>
-                    <span style={styles.actVal}>{selectedUserHistory.joined || 'Standard Registration'}</span>
+                    <span style={styles.actVal}>{selectedUserHistory.joined ? String(selectedUserHistory.joined).split('T')[0] : 'Standard Registration'}</span>
                   </div>
 
                   <div style={styles.activityProfileCard}>
@@ -1126,7 +1157,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {userPayments.map((payment, idx) => (
-                      <div key={payment.id || idx} style={styles.paymentCard}>
+                      <div key={payment.id || payment._id || idx} style={styles.paymentCard}>
                         <div style={styles.paymentCardHeader}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <CheckCircle2 size={16} color="#22c55e" />
@@ -1418,7 +1449,6 @@ const styles = {
   boxFare: { fontSize: '1.1rem', fontWeight: '800', color: '#22c55e' },
   viewDetailsHint: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' },
 
-  /* MODAL STYLES */
   modalContentLarge: {
     backgroundColor: '#27272a',
     border: '1px solid #3f3f46',
@@ -1523,9 +1553,9 @@ const styles = {
     height: '38px',
     borderRadius: '8px',
     display: 'flex',
-    justifyContent: 'center',
+    justify: 'center',
     alignItems: 'center',
-    textAlign: 'center',        // Ensures text content is centered
+    textAlign: 'center',
     padding: 0,
     margin: 0,
     lineHeight: 'normal',
@@ -1611,7 +1641,6 @@ const styles = {
     fontWeight: '700'
   },
 
-  /* TABLE & PROFILE STYLES */
   table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left' },
   th: { padding: '14px 16px', borderBottom: '1px solid #3f3f46', color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
   tr: { borderBottom: '1px solid #3f3f46' },
@@ -1629,7 +1658,6 @@ const styles = {
   emptyBoxCompact: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center', color: '#71717a', gap: '8px', backgroundColor: '#18181b', borderRadius: '10px', border: '1px solid #3f3f46' },
   historyBtn: { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' },
 
-  /* USER LOG STYLES */
   activityProfileSection: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px', padding: '16px' },
   activityProfileHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' },
   activityProfileGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' },

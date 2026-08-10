@@ -6,15 +6,14 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // --- MongoDB Connection ---
-// Fix: Checks MONGODB_URI first (matching your .env file)
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bus_booking';
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log(' Connected to MongoDB Atlas successfully!'))
-  .catch((err) => console.error(' MongoDB Connection Error:', err));
+  .then(() => console.log('Connected to MongoDB Atlas successfully!'))
+  .catch((err) => console.error('MongoDB Connection Error:', err));
 
 // --- Schemas & Models ---
 const userSchema = new mongoose.Schema({
@@ -70,7 +69,10 @@ app.post('/api/signup', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    const existingUser = await User.findOne({ $or: [{ email }, { phone: email }] });
+    const query = [{ email: email.toLowerCase() }];
+    if (phone) query.push({ phone: phone });
+
+    const existingUser = await User.findOne({ $or: query });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email or phone number.' });
     }
@@ -79,8 +81,8 @@ app.post('/api/signup', async (req, res) => {
 
     const newUser = new User({
       name,
-      email,
-      phone,
+      email: email.toLowerCase(),
+      phone: phone || '',
       password: hashedPassword,
       role: role || 'user'
     });
@@ -112,9 +114,9 @@ app.post('/api/signin', async (req, res) => {
       return res.status(400).json({ message: 'Email/Phone and password are required.' });
     }
 
-    // Fix: Allows login via either Email OR Phone number
+    const formattedInput = email.trim();
     const user = await User.findOne({
-      $or: [{ email: email }, { phone: email }]
+      $or: [{ email: formattedInput.toLowerCase() }, { phone: formattedInput }]
     });
 
     if (!user) {
@@ -167,22 +169,17 @@ app.post('/api/buses', async (req, res) => {
 });
 
 // Server Initialization
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
 
-// Gracefully close server when VS Code or terminal exits
 process.on('SIGINT', () => {
   console.log('Closing Express server...');
-  server.close(() => {
-    process.exit(0);
-  });
+  server.close(() => process.exit(0));
 });
 
 process.on('SIGTERM', () => {
   console.log('Closing Express server...');
-  server.close(() => {
-    process.exit(0);
-  });
+  server.close(() => process.exit(0));
 });
