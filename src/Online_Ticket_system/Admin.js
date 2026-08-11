@@ -118,7 +118,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   });
   const [editMsg, setEditMsg] = useState({ type: '', text: '' });
 
-  // Fetch buses, users & tickets directly from backend Express/MongoDB API
+  // Fetch buses, registered users, and tickets live from backend database
   useEffect(() => {
     const fetchData = async () => {
       // 1. Fetch Buses
@@ -133,7 +133,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         console.warn('Backend unavailable, using cached bus data.');
       }
 
-      // 2. Fetch Live Registered Users from MongoDB Atlas
+      // 2. Fetch Live Registered Users from MongoDB
       try {
         const res = await fetch(`${API_BASE}/users`);
         if (res.ok) {
@@ -179,18 +179,18 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     }, 0);
   }, [ticketSales]);
 
-  // Filter out admin/staff accounts to isolate real passengers
+  // Filter out admin/staff accounts to display only real passenger sign-ups
   const realPassengers = useMemo(() => {
     return registeredUsers.filter((u) => {
       const isRoleAdmin = u.role === 'admin' || u.isAdmin === true;
-      const isEmailAdmin = u.email && u.email.toLowerCase().includes('admin');
+      const isEmailAdmin = u.email && u.email.toLowerCase().startsWith('admin');
       const isNameAdmin = u.name && u.name.toLowerCase().trim() === 'admin';
 
       return !isRoleAdmin && !isEmailAdmin && !isNameAdmin;
     });
   }, [registeredUsers]);
 
-  // Passenger search filtering on real passengers only
+  // Search filtering over real passengers
   const filteredUsers = useMemo(() => {
     if (!userSearchTerm.trim()) return realPassengers;
     const term = userSearchTerm.toLowerCase();
@@ -325,7 +325,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     setBuses((prev) => prev.filter((bus) => bus.id !== id && bus._id !== id));
   };
 
-  // Toggle seat booking state directly as admin
   const handleToggleSeatAdmin = (seatId) => {
     if (!selectedBusDetails) return;
 
@@ -346,7 +345,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     );
   };
 
-  // Export Registered Real Passengers to CSV
   const handleExportUsersCSV = () => {
     if (!realPassengers.length) {
       alert('No passenger data available to export.');
@@ -647,7 +645,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                 <div>
                   <h3 style={styles.cardTitle}>Registered Passengers</h3>
                   <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
-                    Live user database synchronized across system terminals
+                    Live user database synchronized directly from MongoDB
                   </span>
                 </div>
               </div>
