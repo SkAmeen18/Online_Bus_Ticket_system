@@ -86,6 +86,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     };
   });
 
+  // Zero default routes: Starts empty if nothing is cached
   const [buses, setBuses] = useState(() => {
     const savedBuses = localStorage.getItem('app_buses');
     return savedBuses ? JSON.parse(savedBuses) : [];
@@ -400,14 +401,18 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createdBus)
       });
+
       if (res.ok) {
         const savedBus = await res.json();
         setBuses((prev) => [...prev, savedBus]);
+        alert('Route saved successfully to cloud database!');
       } else {
         setBuses((prev) => [...prev, createdBus]);
+        alert('Saved locally. Backend cloud server returned an error.');
       }
     } catch (err) {
       setBuses((prev) => [...prev, createdBus]);
+      alert('Saved locally. Could not connect to live MongoDB backend.');
     }
 
     handleCloseModal();
