@@ -1,15 +1,12 @@
 {
   "files": {
-    "main.css": "/static/css/main.f855e6bc.css",
-    "main.js": "/static/js/main.3a1d83e1.js",
-    "static/js/453.fd2f0c4a.chunk.js": "/static/js/453.fd2f0c4a.chunk.js",
-    "index.html": "/index.html",
-    "main.f855e6bc.css.map": "/static/css/main.f855e6bc.css.map",
-    "main.3a1d83e1.js.map": "/static/js/main.3a1d83e1.js.map",
-    "453.fd2f0c4a.chunk.js.map": "/static/js/453.fd2f0c4a.chunk.js.map"
+    "main.css": "/Online_Bus_Ticket_system/static/css/main.4efb37a3.css",
+    "main.js": "/Online_Bus_Ticket_system/static/js/main.a39d0628.js",
+    "static/js/206.b1625a68.chunk.js": "/Online_Bus_Ticket_system/static/js/206.b1625a68.chunk.js",
+    "index.html": "/Online_Bus_Ticket_system/index.html"
   },
   "entrypoints": [
-    "static/css/main.f855e6bc.css",
-    "static/js/main.3a1d83e1.js"
+    "static/css/main.4efb37a3.css",
+    "static/js/main.a39d0628.js"
   ]
 }
