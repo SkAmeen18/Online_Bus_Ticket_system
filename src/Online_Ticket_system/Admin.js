@@ -118,9 +118,10 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   });
   const [editMsg, setEditMsg] = useState({ type: '', text: '' });
 
-  // Fetch buses & Sync local storage state
+  // Fetch buses, users & tickets directly from backend Express/MongoDB API
   useEffect(() => {
-    const fetchBuses = async () => {
+    const fetchData = async () => {
+      // 1. Fetch Buses
       try {
         const res = await fetch(`${API_BASE}/buses`);
         if (res.ok) {
@@ -131,19 +132,37 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       } catch (err) {
         console.warn('Backend unavailable, using cached bus data.');
       }
+
+      // 2. Fetch Live Registered Users from MongoDB Atlas
+      try {
+        const res = await fetch(`${API_BASE}/users`);
+        if (res.ok) {
+          const data = await res.json();
+          setRegisteredUsers(data);
+          localStorage.setItem('app_users', JSON.stringify(data));
+        }
+      } catch (err) {
+        console.warn('Backend user fetch failed, using local fallback.');
+        const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
+        setRegisteredUsers(loadedUsers);
+      }
+
+      // 3. Fetch Tickets
+      try {
+        const res = await fetch(`${API_BASE}/tickets`);
+        if (res.ok) {
+          const data = await res.json();
+          setTicketSales(data);
+          localStorage.setItem('app_tickets', JSON.stringify(data));
+        }
+      } catch (err) {
+        console.warn('Backend ticket fetch failed, using local fallback.');
+        const loadedTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
+        setTicketSales(loadedTickets);
+      }
     };
 
-    const syncData = () => {
-      const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
-      const loadedTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
-      setRegisteredUsers(loadedUsers);
-      setTicketSales(loadedTickets);
-    };
-
-    fetchBuses();
-    syncData();
-    window.addEventListener('storage', syncData);
-    return () => window.removeEventListener('storage', syncData);
+    fetchData();
   }, [activeTab]);
 
   useEffect(() => {
