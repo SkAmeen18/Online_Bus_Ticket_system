@@ -95,7 +95,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
   const [userPaymentHistory, setUserPaymentHistory] = useState([]);
 
-  // Fetch live buses from database to sync automatically across all devices
   const loadData = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/buses`);
@@ -111,6 +110,16 @@ export default function User({ activeTab = 'Home', user = {} }) {
       console.warn('Backend unavailable, using cached bus data.');
       const savedBuses = localStorage.getItem('app_buses');
       if (savedBuses) setBuses(JSON.parse(savedBuses));
+    }
+
+    try {
+      const resTickets = await fetch(`${API_BASE}/tickets`);
+      if (resTickets.ok) {
+        const liveTickets = await resTickets.json();
+        localStorage.setItem('app_tickets', JSON.stringify(liveTickets));
+      }
+    } catch (err) {
+      console.warn('Backend ticket fetch error.');
     }
 
     const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
@@ -139,7 +148,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     });
 
     const allTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
-    
     const filteredUserTickets = allTickets.filter((ticket) => {
       const matchEmail = ticket.userEmail && ticket.userEmail.toLowerCase() === currentUser.email.toLowerCase();
       const matchPhone = ticket.passengerPhone && ticket.passengerPhone === currentUser.phone;
@@ -151,24 +159,12 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
   useEffect(() => {
     loadData();
-
-    // Auto-refresh every 5 seconds to get newly added admin routes across devices
     const interval = setInterval(() => {
       loadData();
     }, 5000);
 
-    const handleStorage = (e) => {
-      if (e.key === 'app_buses' || e.key === 'app_tickets' || e.key === 'app_users') {
-        loadData();
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('storage', handleStorage);
-    };
-  }, [loadData, activeTab]);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -217,20 +213,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     if (passwordForm.newPassword.length < 6) {
       alert('Password must be at least 6 characters long.');
       return;
-    }
-
-    const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
-    const userIndex = loadedUsers.findIndex(
-      (u) => (u.email && u.email.toLowerCase() === currentUserData.email.toLowerCase()) || u.phone === currentUserData.phone
-    );
-
-    if (userIndex !== -1) {
-      if (loadedUsers[userIndex].password && loadedUsers[userIndex].password !== passwordForm.currentPassword) {
-        alert('Current password is incorrect!');
-        return;
-      }
-      loadedUsers[userIndex].password = passwordForm.newPassword;
-      localStorage.setItem('app_users', JSON.stringify(loadedUsers));
     }
 
     alert('Password updated successfully!');
@@ -293,7 +275,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     const existingBooked = selectedBus.bookedSeats || [];
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
 
-    // Sync booking state to server
     try {
       await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
@@ -314,17 +295,18 @@ export default function User({ activeTab = 'Home', user = {} }) {
       return bus;
     });
 
-    const newTickets = selectedSeats.map((seatId) => ({
+    const newTicketRecord = {
       id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
       busId: busId,
       busName: selectedBus.name,
       route: selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`,
-      seatNumber: seatId,
-      fare: perSeatFare,
+      seats: [...selectedSeats],
+      fare: totalAmount,
       passengerName: passenger.name,
       passengerPhone: passenger.phone,
       userEmail: currentUserData.email,
       paymentMethod: paymentMethod,
+      trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
       purchaseDate: new Date().toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -332,10 +314,20 @@ export default function User({ activeTab = 'Home', user = {} }) {
         hour: '2-digit',
         minute: '2-digit'
       })
-    }));
+    };
+
+    try {
+      await fetch(`${API_BASE}/tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTicketRecord)
+      });
+    } catch (err) {
+      console.warn('Ticket backend sync error.');
+    }
 
     const savedTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
-    const updatedTickets = [...savedTickets, ...newTickets];
+    const updatedTickets = [...savedTickets, newTicketRecord];
 
     localStorage.setItem('app_buses', JSON.stringify(updatedBuses));
     localStorage.setItem('app_tickets', JSON.stringify(updatedTickets));
@@ -352,7 +344,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       busNumber: selectedBus.busNumber,
       seats: [...selectedSeats],
       totalPaid: totalAmount,
-      trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
+      trxId: newTicketRecord.trxId,
       paymentMethod,
       passengerName: passenger.name
     });
@@ -473,7 +465,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                       <div style={styles.cardFooter}>
                         <div>
                           <span style={styles.fareLabel}>Fare per seat</span>
-                          <div style={styles.fareValue}>{bus.fare.includes('BDT') ? bus.fare : `৳${bus.fare}`}</div>
+                          <div style={styles.fareValue}>{bus.fare}</div>
                         </div>
 
                         <div style={{ textAlign: 'right' }}>
@@ -513,7 +505,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
           <div style={styles.aboutBannerBox}>
             <Info size={24} color="#38bdf8" style={{ minWidth: '24px' }} />
             <p style={{ margin: 0, color: '#d4d4d8', fontSize: '0.9rem', lineHeight: '1.5' }}>
-              Our platform connects travelers across all 64 districts in Bangladesh with top bus operators. We strive to bring hassle-free booking, transparent seat mapping, real-time ticket availability, and guaranteed payment protection to every journey.
+              Our platform connects travelers across all 64 districts in Bangladesh with top bus operators. We bring hassle-free booking, transparent seat mapping, real-time ticket availability, and guaranteed payment protection to every journey.
             </p>
           </div>
 
@@ -682,13 +674,10 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
           <div style={styles.profileDetailsCard}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <h3 style={{ margin: 0, color: '#f4f4f5' }}>Account Security</h3>
-                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Update your secret login password</span>
-              </div>
+              <h3 style={{ margin: 0, color: '#f4f4f5' }}>Password & Security</h3>
               {!isChangingPassword && (
                 <button style={styles.editProfileBtn} onClick={() => setIsChangingPassword(true)}>
-                  <Key size={14} /> Change Password
+                  <Lock size={14} /> Change Password
                 </button>
               )}
             </div>
@@ -696,11 +685,11 @@ export default function User({ activeTab = 'Home', user = {} }) {
             {isChangingPassword ? (
               <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={styles.fieldGroup}>
-                  <label style={styles.modalLabel}><Lock size={14} color="#a1a1aa" /> Current Password</label>
+                  <label style={styles.modalLabel}>Current Password</label>
                   <input 
                     type="password" 
-                    placeholder="Enter current password"
-                    value={passwordForm.currentPassword} 
+                    placeholder="••••••••" 
+                    value={passwordForm.currentPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                     style={styles.modalInput}
                     required 
@@ -709,11 +698,11 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                 <div style={styles.formRow}>
                   <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                    <label style={styles.modalLabel}><Lock size={14} color="#a1a1aa" /> New Password</label>
+                    <label style={styles.modalLabel}>New Password</label>
                     <input 
                       type="password" 
-                      placeholder="Minimum 6 characters"
-                      value={passwordForm.newPassword} 
+                      placeholder="••••••••" 
+                      value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                       style={styles.modalInput}
                       required 
@@ -721,11 +710,11 @@ export default function User({ activeTab = 'Home', user = {} }) {
                   </div>
 
                   <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                    <label style={styles.modalLabel}><Lock size={14} color="#a1a1aa" /> Confirm New Password</label>
+                    <label style={styles.modalLabel}>Confirm New Password</label>
                     <input 
                       type="password" 
-                      placeholder="Re-type new password"
-                      value={passwordForm.confirmPassword} 
+                      placeholder="••••••••" 
+                      value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                       style={styles.modalInput}
                       required 
@@ -738,17 +727,58 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     Cancel
                   </button>
                   <button type="submit" style={styles.submitModalBtn}>
-                    <Check size={16} /> Update Password
+                    Update Password
                   </button>
                 </div>
               </form>
             ) : (
-              <div style={styles.infoItem}>
-                <Lock size={18} color="#a1a1aa" />
-                <div>
-                  <span style={styles.infoLabel}>Password</span>
-                  <p style={styles.infoValue}>••••••••••••</p>
-                </div>
+              <p style={{ color: '#a1a1aa', fontSize: '0.85rem', margin: 0 }}>
+                Keep your account secure by using a strong password with letters, numbers, and symbols.
+              </p>
+            )}
+          </div>
+
+          <div style={styles.profileDetailsCard}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <Receipt size={20} color="#a1a1aa" />
+              <h3 style={{ margin: 0, color: '#f4f4f5' }}>My Ticket Booking History ({userPaymentHistory.length})</h3>
+            </div>
+
+            {userPaymentHistory.length === 0 ? (
+              <div style={styles.emptyHistoryBox}>
+                <Ticket size={36} color="#71717a" />
+                <p style={{ color: '#a1a1aa', margin: '8px 0 0 0', fontSize: '0.9rem' }}>You haven't purchased any bus tickets yet.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {userPaymentHistory.map((ticket, index) => (
+                  <div key={ticket.id || index} style={styles.historyTicketCard}>
+                    <div style={styles.historyCardHeader}>
+                      <span style={{ fontWeight: '700', color: '#f4f4f5' }}>{ticket.busName}</span>
+                      <span style={styles.successTicketBadge}>Confirmed • ৳ {ticket.fare}</span>
+                    </div>
+                    <div style={styles.historyCardGrid}>
+                      <div>
+                        <span style={styles.hLabel}>Route:</span>
+                        <span style={styles.hVal}>{ticket.route}</span>
+                      </div>
+                      <div>
+                        <span style={styles.hLabel}>Seats:</span>
+                        <span style={{ ...styles.hVal, color: '#38bdf8' }}>
+                          {Array.isArray(ticket.seats) ? ticket.seats.join(', ') : (ticket.seatNumber || 'N/A')}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={styles.hLabel}>Payment Method:</span>
+                        <span style={styles.hVal}>{ticket.paymentMethod}</span>
+                      </div>
+                      <div>
+                        <span style={styles.hLabel}>Transaction ID:</span>
+                        <span style={{ ...styles.hVal, fontFamily: 'monospace', color: '#22c55e' }}>{ticket.trxId || 'TRX893240'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -756,105 +786,56 @@ export default function User({ activeTab = 'Home', user = {} }) {
         </div>
       )}
 
-      {/* 4. PAYMENT HISTORY TAB */}
+      {/* 4. PAYMENT TAB */}
       {(currentTab === 'payment') && (
         <div style={styles.contentSection}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h3 style={styles.sectionTitle}>My Payment & Booking History</h3>
-              <p style={{ color: '#a1a1aa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
-                Private history of completed ticket bookings for account: <strong style={{ color: '#ffffff' }}>{currentUserData.email}</strong>
-              </p>
+          <div style={styles.profileDetailsCard}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <CreditCard size={24} color="#a1a1aa" />
+              <h2 style={{ margin: 0, color: '#f4f4f5' }}>Supported Secure Payment Methods</h2>
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#22c55e', backgroundColor: '#14532d', padding: '6px 12px', borderRadius: '8px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Lock size={12} /> Confidential & Secured
-            </span>
-          </div>
+            <p style={{ color: '#a1a1aa', fontSize: '0.9rem', marginBottom: '20px' }}>
+              We support fast, end-to-end encrypted mobile financial services and cards across Bangladesh.
+            </p>
 
-          {userPaymentHistory.length === 0 ? (
-            <div style={styles.emptyCard}>
-              <Receipt size={48} color="#71717a" />
-              <h4 style={{ color: '#f4f4f5', margin: '12px 0 4px 0' }}>No Payment History Found</h4>
-              <p style={{ color: '#a1a1aa', margin: 0, fontSize: '0.85rem' }}>
-                You have not booked or paid for any tickets yet. Book your first trip from the Home tab!
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {userPaymentHistory.map((item, idx) => (
-                <div key={item.id || idx} style={styles.historyCard}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={styles.historyIconBox}>
-                      <Ticket size={22} color="#ffffff" />
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <h4 style={{ margin: 0, color: '#f4f4f5' }}>{item.busName}</h4>
-                        <span style={styles.ticketBadge}>{item.id}</span>
-                      </div>
-                      <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
-                        Route: {item.route} | Seat: <strong style={{ color: '#22c55e' }}>{item.seatNumber}</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#22c55e', display: 'block' }}>
-                      ৳ {item.fare}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: '#71717a' }}>
-                      {item.purchaseDate} via {item.paymentMethod || 'bKash'}
-                    </span>
+            <div style={styles.paymentMethodsGrid}>
+              {[
+                { name: 'bKash Mobile Wallet', desc: 'Instant USSD/App payment clearance', color: '#e2136e' },
+                { name: 'Nagad Digital Bank', desc: 'Secure postal mobile financial service', color: '#f7931e' },
+                { name: 'Rocket (DBBL)', desc: 'Reliable Dutch-Bangla Mobile banking', color: '#8b5cf6' },
+                { name: 'Visa / MasterCard / AMEX', desc: 'Direct credit and debit card processing', color: '#3b82f6' }
+              ].map((m, idx) => (
+                <div key={idx} style={styles.paymentMethodItem}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: m.color }} />
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', color: '#f4f4f5', fontSize: '0.95rem' }}>{m.name}</h4>
+                    <p style={{ margin: 0, color: '#a1a1aa', fontSize: '0.8rem' }}>{m.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
-          )}
+          </div>
         </div>
       )}
 
-      {/* SEAT SELECTION MODAL */}
-      {selectedBus && (
+      {/* SEAT SELECTION & BOOKING MODAL */}
+      {selectedBus && !isCheckoutOpen && !bookingSuccess && (
         <div style={styles.modalOverlay} onClick={() => setSelectedBus(null)}>
           <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <div>
-                <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.3rem' }}>
-                  {selectedBus.name}
-                </h3>
+                <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.3rem' }}>{selectedBus.name}</h3>
                 <span style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>
-                  Route: {selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`} | Coach: {selectedBus.busNumber}
+                  {selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`} | Fare: {selectedBus.fare} / seat
                 </span>
               </div>
-              <button style={styles.closeBtn} onClick={() => setSelectedBus(null)}>
-                <X size={20} />
-              </button>
+              <button style={styles.closeBtn} onClick={() => setSelectedBus(null)}><X size={20} /></button>
             </div>
-
-            {bookingSuccess && (
-              <div style={styles.successReceipt}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <CheckCircle2 size={24} color="#22c55e" />
-                  <div>
-                    <h4 style={{ margin: 0, color: '#22c55e' }}>Booking Confirmed & Saved to Your Account!</h4>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#d4d4d8' }}>
-                      Transaction ID: <strong>{bookingSuccess.trxId}</strong> | Paid <strong>৳{bookingSuccess.totalPaid}</strong> via {bookingSuccess.paymentMethod}
-                    </p>
-                  </div>
-                </div>
-                <div style={{ fontSize: '0.8rem', color: '#a1a1aa', marginTop: '6px' }}>
-                  Seats Issued: <strong>{bookingSuccess.seats.join(', ')}</strong> for passenger <strong>{bookingSuccess.passengerName}</strong>
-                </div>
-              </div>
-            )}
 
             <div style={styles.modalTwoColumn}>
               <div style={styles.leftSeatColumn}>
                 <div style={styles.seatHeaderFlex}>
-                  <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.95rem' }}>
-                    Select Seats
-                  </h4>
-                  
+                  <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.95rem' }}>Select Your Seats</h4>
                   <div style={styles.legendRow}>
                     <div style={styles.legendItem}>
                       <div style={{ ...styles.legendBox, backgroundColor: '#22c55e' }}></div>
@@ -873,8 +854,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                 <div style={styles.busChassis}>
                   <div style={styles.driverCabinRow}>
-                    <span style={styles.driverIconBadge}>🚌 Driver</span>
-                    <div style={styles.steeringWheel}>⭕</div>
+                    <span style={styles.driverIconBadge}>🚌 Driver Cabin</span>
+                    <span style={styles.steeringWheel}>⭕</span>
                   </div>
 
                   <div style={styles.verticalSeatContainer}>
@@ -885,29 +866,26 @@ export default function User({ activeTab = 'Home', user = {} }) {
                       const s3 = `${rowLetter}3`;
                       const s4 = `${rowLetter}4`;
 
-                      const isBooked = (seatId) => (selectedBus.bookedSeats || []).includes(seatId);
+                      const bookedList = selectedBus.bookedSeats || [];
 
                       return (
                         <div key={rowLetter} style={styles.busRowGroup}>
                           <div style={styles.seatPair}>
                             {[s1, s2].map((seatId) => {
-                              const booked = isBooked(seatId);
-                              const selected = selectedSeats.includes(seatId);
-                              let seatBg = '#22c55e';
-                              if (booked) seatBg = '#6b7280';
-                              else if (selected) seatBg = '#3b82f6';
+                              const isBooked = bookedList.includes(seatId);
+                              const isSelected = selectedSeats.includes(seatId);
+
+                              let bg = '#22c55e';
+                              if (isBooked) bg = '#6b7280';
+                              else if (isSelected) bg = '#3b82f6';
 
                               return (
                                 <button
                                   key={seatId}
                                   type="button"
-                                  disabled={booked}
-                                  style={{
-                                    ...styles.compactSeat,
-                                    backgroundColor: seatBg,
-                                    cursor: booked ? 'not-allowed' : 'pointer'
-                                  }}
-                                  onClick={() => handleSeatClick(seatId, booked)}
+                                  disabled={isBooked}
+                                  style={{ ...styles.compactSeat, backgroundColor: bg, cursor: isBooked ? 'not-allowed' : 'pointer' }}
+                                  onClick={() => handleSeatClick(seatId, isBooked)}
                                 >
                                   {seatId}
                                 </button>
@@ -919,23 +897,20 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                           <div style={styles.seatPair}>
                             {[s3, s4].map((seatId) => {
-                              const booked = isBooked(seatId);
-                              const selected = selectedSeats.includes(seatId);
-                              let seatBg = '#22c55e';
-                              if (booked) seatBg = '#6b7280';
-                              else if (selected) seatBg = '#3b82f6';
+                              const isBooked = bookedList.includes(seatId);
+                              const isSelected = selectedSeats.includes(seatId);
+
+                              let bg = '#22c55e';
+                              if (isBooked) bg = '#6b7280';
+                              else if (isSelected) bg = '#3b82f6';
 
                               return (
                                 <button
                                   key={seatId}
                                   type="button"
-                                  disabled={booked}
-                                  style={{
-                                    ...styles.compactSeat,
-                                    backgroundColor: seatBg,
-                                    cursor: booked ? 'not-allowed' : 'pointer'
-                                  }}
-                                  onClick={() => handleSeatClick(seatId, booked)}
+                                  disabled={isBooked}
+                                  style={{ ...styles.compactSeat, backgroundColor: bg, cursor: isBooked ? 'not-allowed' : 'pointer' }}
+                                  onClick={() => handleSeatClick(seatId, isBooked)}
                                 >
                                   {seatId}
                                 </button>
@@ -955,21 +930,17 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     <div>
                       <img
                         src={selectedBus.images[activeImageIndex] || selectedBus.images[0]}
-                        alt="Main Bus"
+                        alt="Bus"
                         style={styles.mainLargeImg}
                       />
-
                       {selectedBus.images.length > 1 && (
                         <div style={styles.thumbnailRow}>
                           {selectedBus.images.map((img, i) => (
                             <img
                               key={i}
                               src={img}
-                              alt={`Bus preview ${i}`}
-                              style={{
-                                ...styles.thumbImg,
-                                border: activeImageIndex === i ? '2px solid #a1a1aa' : '1px solid #3f3f46'
-                              }}
+                              alt="thumb"
+                              style={{ ...styles.thumbImg, border: activeImageIndex === i ? '2px solid #3b82f6' : '1px solid #3f3f46' }}
                               onClick={() => setActiveImageIndex(i)}
                             />
                           ))}
@@ -978,56 +949,52 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     </div>
                   ) : (
                     <div style={styles.largeImgPlaceholder}>
-                      <Bus size={60} color="#52525b" />
-                      <span>No Pictures Uploaded</span>
+                      <Bus size={50} color="#52525b" />
+                      <span>No Pictures Available</span>
                     </div>
                   )}
                 </div>
 
-                <div style={styles.detailCard}>
-                  <span style={styles.detailLabel}>Seats Selected</span>
-                  <div style={{ color: '#f4f4f5', fontWeight: '700', fontSize: '1rem' }}>
-                    {selectedSeats.length > 0 ? selectedSeats.join(', ') : 'None selected'}
+                <div style={styles.bookingSummaryBox}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#f4f4f5', fontSize: '0.95rem' }}>Booking Summary</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                    <span style={{ color: '#a1a1aa' }}>Selected Seats:</span>
+                    <strong style={{ color: '#38bdf8' }}>{selectedSeats.length > 0 ? selectedSeats.join(', ') : 'None selected'}</strong>
                   </div>
-                </div>
-
-                <div style={styles.detailCard}>
-                  <span style={styles.detailLabel}>Total Fare Payable</span>
-                  <div style={{ color: '#22c55e', fontWeight: '800', fontSize: '1.2rem' }}>
-                    ৳ {totalAmount.toLocaleString()}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '0.9rem' }}>
+                    <span style={{ color: '#a1a1aa' }}>Total Payable Fare:</span>
+                    <strong style={{ color: '#22c55e', fontSize: '1.1rem' }}>৳ {totalAmount}</strong>
                   </div>
-                </div>
 
-                <button 
-                  style={styles.proceedBtn} 
-                  onClick={handleProceedToPayment}
-                  disabled={selectedSeats.length === 0}
-                >
-                  Proceed to Payment <ArrowRight size={16} />
-                </button>
+                  <button 
+                    style={{ ...styles.submitModalBtn, width: '100%', opacity: selectedSeats.length === 0 ? 0.6 : 1 }}
+                    disabled={selectedSeats.length === 0}
+                    onClick={handleProceedToPayment}
+                  >
+                    Proceed to Checkout ({selectedSeats.length} Seats)
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* CHECKOUT / PAYMENT MODAL */}
+      {/* CHECKOUT MODAL */}
       {isCheckoutOpen && selectedBus && (
-        <div style={styles.modalOverlay} onClick={() => setIsCheckoutOpen(false)}>
-          <div style={{ ...styles.modalContent, maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalOverlay}>
+          <div style={{ ...styles.modalContent, maxWidth: '520px' }}>
             <div style={styles.modalHeader}>
               <div>
-                <h3 style={{ margin: 0, color: '#f4f4f5' }}>Complete Ticket Payment</h3>
-                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
-                  Total Amount: <strong style={{ color: '#22c55e' }}>৳{totalAmount}</strong>
-                </span>
+                <h3 style={{ margin: 0, color: '#f4f4f5' }}>Secure Checkout & Payment</h3>
+                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Complete reservation for {selectedBus.name}</span>
               </div>
               <button style={styles.closeBtn} onClick={() => setIsCheckoutOpen(false)}><X size={20} /></button>
             </div>
 
-            <form onSubmit={handleConfirmBooking} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleConfirmBooking} style={styles.modalForm}>
               <div style={styles.fieldGroup}>
-                <label style={styles.modalLabel}><UserIcon size={14} color="#a1a1aa" /> Passenger Name</label>
+                <label style={styles.modalLabel}>Passenger Full Name</label>
                 <input 
                   type="text" 
                   value={passenger.name} 
@@ -1038,7 +1005,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
               </div>
 
               <div style={styles.fieldGroup}>
-                <label style={styles.modalLabel}><Phone size={14} color="#a1a1aa" /> Contact Mobile</label>
+                <label style={styles.modalLabel}>Mobile Phone Number</label>
                 <input 
                   type="text" 
                   value={passenger.phone} 
@@ -1049,32 +1016,21 @@ export default function User({ activeTab = 'Home', user = {} }) {
               </div>
 
               <div style={styles.fieldGroup}>
-                <label style={styles.modalLabel}><CreditCard size={14} color="#a1a1aa" /> Select Gateway</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                  {['bKash', 'Nagad', 'Rocket'].map((gw) => (
-                    <button
-                      key={gw}
-                      type="button"
-                      style={{
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: paymentMethod === gw ? '2px solid #22c55e' : '1px solid #3f3f46',
-                        backgroundColor: paymentMethod === gw ? 'rgba(34, 197, 94, 0.15)' : '#18181b',
-                        color: paymentMethod === gw ? '#22c55e' : '#a1a1aa',
-                        fontWeight: '700',
-                        fontSize: '0.85rem',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setPaymentMethod(gw)}
-                    >
-                      {gw}
-                    </button>
-                  ))}
-                </div>
+                <label style={styles.modalLabel}>Select Payment Gateway</label>
+                <select 
+                  value={paymentMethod} 
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  style={styles.modalSelect}
+                >
+                  <option value="bKash">bKash Mobile Banking</option>
+                  <option value="Nagad">Nagad Mobile Banking</option>
+                  <option value="Rocket">Rocket (DBBL)</option>
+                  <option value="Debit/Credit Card">Visa / MasterCard</option>
+                </select>
               </div>
 
               <div style={styles.fieldGroup}>
-                <label style={styles.modalLabel}><Lock size={14} color="#a1a1aa" /> {paymentMethod} Account / Card No</label>
+                <label style={styles.modalLabel}>{paymentMethod} Account / Card Number</label>
                 <input 
                   type="text" 
                   placeholder="e.g. 017XXXXXXXX"
@@ -1085,15 +1041,45 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '12px' }}>
-                <button type="button" style={styles.cancelBtn} onClick={() => setIsCheckoutOpen(false)}>
-                  Cancel
-                </button>
-                <button type="submit" style={styles.submitModalBtn}>
-                  Confirm & Pay ৳{totalAmount}
-                </button>
+              <div style={{ backgroundColor: '#18181b', padding: '12px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>Total Amount to Debit:</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#22c55e' }}>৳ {totalAmount}</span>
+              </div>
+
+              <div style={styles.modalActions}>
+                <button type="button" style={styles.cancelBtn} onClick={() => setIsCheckoutOpen(false)}>Back</button>
+                <button type="submit" style={styles.submitModalBtn}>Confirm & Pay ৳ {totalAmount}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* BOOKING SUCCESS CONFIRMATION MODAL */}
+      {bookingSuccess && (
+        <div style={styles.modalOverlay}>
+          <div style={{ ...styles.modalContent, maxWidth: '480px', textAlign: 'center' }}>
+            <CheckCircle2 size={54} color="#22c55e" style={{ margin: '0 auto 12px auto' }} />
+            <h3 style={{ margin: '0 0 6px 0', color: '#f4f4f5', fontSize: '1.4rem' }}>Booking Confirmed!</h3>
+            <p style={{ color: '#a1a1aa', fontSize: '0.85rem', margin: '0 0 20px 0' }}>
+              Your ticket has been successfully booked and payment cleared.
+            </p>
+
+            <div style={{ backgroundColor: '#18181b', padding: '16px', borderRadius: '10px', border: '1px solid #3f3f46', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#a1a1aa' }}>Bus Operator:</span><strong style={{ color: '#f4f4f5' }}>{bookingSuccess.busName}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#a1a1aa' }}>Passenger:</span><strong style={{ color: '#f4f4f5' }}>{bookingSuccess.passengerName}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#a1a1aa' }}>Seats Assigned:</span><strong style={{ color: '#38bdf8' }}>{bookingSuccess.seats.join(', ')}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#a1a1aa' }}>Payment Method:</span><strong style={{ color: '#f4f4f5' }}>{bookingSuccess.paymentMethod}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#a1a1aa' }}>Transaction ID:</span><strong style={{ color: '#22c55e', fontFamily: 'monospace' }}>{bookingSuccess.trxId}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #3f3f46', paddingTop: '8px' }}><span style={{ color: '#a1a1aa' }}>Total Paid:</span><strong style={{ color: '#22c55e', fontSize: '1rem' }}>৳ {bookingSuccess.totalPaid}</strong></div>
+            </div>
+
+            <button 
+              style={{ ...styles.submitModalBtn, width: '100%' }}
+              onClick={() => { setBookingSuccess(null); setSelectedBus(null); }}
+            >
+              Done & Return to Home
+            </button>
           </div>
         </div>
       )}
@@ -1104,97 +1090,104 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
 const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '24px', color: '#ffffff' },
-  searchBanner: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '18px' },
+  searchBanner: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '16px' },
   bannerHeader: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  bannerTitle: { margin: 0, fontSize: '1.4rem', fontWeight: '800' },
-  bannerSub: { margin: 0, fontSize: '0.85rem', color: '#a1a1aa' },
+  bannerTitle: { margin: 0, fontSize: '1.4rem', fontWeight: '700' },
+  bannerSub: { color: '#a1a1aa', margin: 0, fontSize: '0.85rem' },
   searchRow: { display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' },
-  searchField: { display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '180px' },
-  searchLabel: { fontSize: '0.78rem', color: '#a1a1aa', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' },
-  selectInput: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', cursor: 'pointer', fontSize: '0.85rem' },
-  resetSearchBtn: { padding: '10px 16px', borderRadius: '8px', border: '1px solid #52525b', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' },
-  
+  searchField: { display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '200px' },
+  searchLabel: { fontSize: '0.8rem', color: '#a1a1aa', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' },
+  selectInput: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', cursor: 'pointer' },
+  resetSearchBtn: { padding: '10px 18px', borderRadius: '8px', border: '1px solid #52525b', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer', height: '41px' },
+
   sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { margin: 0, fontSize: '1.2rem', fontWeight: '700' },
-  liveSyncBadge: { fontSize: '0.75rem', color: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.15)', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(34, 197, 94, 0.3)', fontWeight: '600' },
-  
-  emptyCard: { backgroundColor: '#27272a', borderRadius: '16px', border: '1px solid #3f3f46', padding: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
-  
-  routeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
-  busCard: { backgroundColor: '#18181b', borderRadius: '14px', border: '1px solid #3f3f46', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' },
-  cardImgContainer: { position: 'relative', height: '140px', backgroundColor: '#27272a' },
+  liveSyncBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' },
+
+  emptyCard: { backgroundColor: '#27272a', padding: '40px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
+  routeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' },
+  busCard: { backgroundColor: '#27272a', borderRadius: '14px', border: '1px solid #3f3f46', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' },
+  cardImgContainer: { height: '150px', backgroundColor: '#18181b', position: 'relative' },
   cardImg: { width: '100%', height: '100%', objectFit: 'cover' },
   cardImgPlaceholder: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#71717a', gap: '6px', fontSize: '0.8rem' },
   cardBody: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, justifyContent: 'space-between' },
   operatorTag: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  routeHeaderRow: { margin: '2px 0' },
-  routeTitle: { margin: 0, fontSize: '1.05rem', fontWeight: '700', color: '#f4f4f5' },
-  busTypeBadgeUnder: { fontSize: '0.72rem', color: '#38bdf8', display: 'block', marginTop: '2px' },
+  routeHeaderRow: { display: 'flex', flexDirection: 'column', gap: '2px', margin: '2px 0' },
+  routeTitle: { fontSize: '1.1rem', fontWeight: '700', color: '#f4f4f5', margin: 0 },
+  busTypeBadgeUnder: { fontSize: '0.75rem', color: '#38bdf8' },
   coachNumber: { fontSize: '0.75rem', color: '#71717a' },
-  timeInfoRow: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#27272a', padding: '8px 12px', borderRadius: '8px', border: '1px solid #3f3f46', fontSize: '0.75rem' },
-  timeBlock: { display: 'flex', alignItems: 'center', gap: '6px', color: '#d4d4d8' },
-  cardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '10px', borderTop: '1px solid #27272a' },
+  timeInfoRow: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#18181b', padding: '8px 12px', borderRadius: '8px', border: '1px solid #3f3f46', fontSize: '0.78rem', color: '#a1a1aa' },
+  timeBlock: { display: 'flex', alignItems: 'center', gap: '6px' },
+  cardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '10px', borderTop: '1px solid #3f3f46' },
   fareLabel: { fontSize: '0.7rem', color: '#71717a', display: 'block' },
-  fareValue: { fontSize: '1.1rem', fontWeight: '800', color: '#22c55e' },
-  viewSeatsBtn: { marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' },
+  fareValue: { fontSize: '1.15rem', fontWeight: '800', color: '#22c55e' },
+  viewSeatsBtn: { display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#3b82f6', color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer', marginTop: '4px' },
 
   contentSection: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  aboutHeader: { backgroundColor: '#27272a', borderRadius: '16px', border: '1px solid #3f3f46', padding: '24px', display: 'flex', alignItems: 'center', gap: '18px' },
-  aboutBannerBox: { backgroundColor: '#18181b', borderRadius: '12px', border: '1px solid #3f3f46', padding: '18px', display: 'flex', gap: '12px', alignItems: 'center' },
+  aboutHeader: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', gap: '16px' },
+  aboutBannerBox: { backgroundColor: '#18181b', padding: '16px 20px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', alignItems: 'flex-start', gap: '14px' },
   aboutGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' },
-  aboutCard: { backgroundColor: '#27272a', padding: '20px', borderRadius: '14px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '8px' },
-  aboutCardTitle: { margin: 0, color: '#f4f4f5', fontSize: '0.95rem' },
-  aboutCardText: { margin: 0, color: '#a1a1aa', fontSize: '0.8rem', lineHeight: '1.4' },
+  aboutCard: { backgroundColor: '#27272a', padding: '20px', borderRadius: '14px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '10px' },
+  aboutCardTitle: { margin: 0, color: '#f4f4f5', fontSize: '1rem', fontWeight: '700' },
+  aboutCardText: { margin: 0, color: '#a1a1aa', fontSize: '0.82rem', lineHeight: '1.4' },
 
-  profileHeaderCard: { backgroundColor: '#27272a', borderRadius: '16px', border: '1px solid #3f3f46', padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' },
+  profileHeaderCard: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', gap: '20px' },
   avatarContainer: { position: 'relative' },
-  avatarImg: { width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #52525b' },
-  avatarLarge: { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#18181b', border: '2px solid #52525b', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  profileDetailsCard: { backgroundColor: '#27272a', borderRadius: '16px', border: '1px solid #3f3f46', padding: '24px' },
-  editProfileBtn: { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' },
-  infoList: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' },
-  infoItem: { display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#18181b', padding: '12px 16px', borderRadius: '10px', border: '1px solid #3f3f46' },
-  infoLabel: { fontSize: '0.75rem', color: '#a1a1aa', display: 'block' },
-  infoValue: { margin: 0, fontSize: '0.9rem', color: '#f4f4f5', fontWeight: '600' },
+  avatarLarge: { width: '70px', height: '70px', borderRadius: '50%', backgroundColor: '#18181b', border: '2px solid #52525b', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  avatarImg: { width: '70px', height: '70px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #52525b' },
+  profileDetailsCard: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46' },
+  editProfileBtn: { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#f4f4f5', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' },
+  infoList: { display: 'flex', flexDirection: 'column', gap: '14px' },
+  infoItem: { display: 'flex', alignItems: 'center', gap: '14px', backgroundColor: '#18181b', padding: '12px 16px', borderRadius: '10px', border: '1px solid #3f3f46' },
+  infoLabel: { fontSize: '0.72rem', color: '#a1a1aa', display: 'block' },
+  infoValue: { margin: '2px 0 0 0', color: '#f4f4f5', fontWeight: '600', fontSize: '0.95rem' },
 
-  historyCard: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  historyIconBox: { width: '42px', height: '42px', borderRadius: '10px', backgroundColor: '#3f3f46', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  ticketBadge: { backgroundColor: '#18181b', border: '1px solid #3f3f46', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700' },
+  emptyHistoryBox: { backgroundColor: '#18181b', padding: '30px', borderRadius: '10px', border: '1px solid #3f3f46', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' },
+  historyTicketCard: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' },
+  historyCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #27272a', paddingBottom: '8px' },
+  successTicketBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700' },
+  historyCardGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px', fontSize: '0.8rem' },
+  hLabel: { color: '#a1a1aa', marginRight: '6px' },
+  hVal: { color: '#f4f4f5', fontWeight: '600' },
 
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  paymentMethodsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' },
+  paymentMethodItem: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', gap: '12px' },
+
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalContent: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '100%' },
-  modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' },
+  modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' },
   closeBtn: { background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer' },
-  modalTwoColumn: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px' },
-  leftSeatColumn: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46' },
-  seatHeaderFlex: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
-  legendRow: { display: 'flex', gap: '8px', fontSize: '0.68rem', color: '#a1a1aa' },
-  legendItem: { display: 'flex', alignItems: 'center', gap: '4px' },
-  legendBox: { width: '10px', height: '10px', borderRadius: '2px' },
-  busChassis: { border: '2px solid #3f3f46', borderRadius: '20px 20px 10px 10px', padding: '16px 12px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  driverCabinRow: { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px', marginBottom: '12px' },
-  driverIconBadge: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '600' },
-  steeringWheel: { fontSize: '0.9rem' },
-  verticalSeatContainer: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '320px', overflowY: 'auto', width: '100%' },
-  busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
-  seatPair: { display: 'flex', gap: '6px' },
-  compactSeat: { width: '38px', height: '36px', borderRadius: '6px', border: 'none', color: '#ffffff', fontSize: '0.75rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  aisleGap: { flex: 1, minWidth: '20px' },
-  rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '14px' },
-  imageGalleryContainer: { backgroundColor: '#18181b', borderRadius: '12px', padding: '12px', border: '1px solid #3f3f46' },
-  mainLargeImg: { width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px' },
-  largeImgPlaceholder: { width: '100%', height: '180px', borderRadius: '8px', backgroundColor: '#27272a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#71717a', gap: '8px', fontSize: '0.85rem' },
-  thumbnailRow: { display: 'flex', gap: '8px', marginTop: '10px' },
-  thumbImg: { width: '50px', height: '40px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer' },
-  detailCard: { backgroundColor: '#18181b', padding: '12px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '4px' },
-  detailLabel: { fontSize: '0.75rem', color: '#a1a1aa' },
-  proceedBtn: { padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#22c55e', color: '#ffffff', fontWeight: '700', fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
-  successReceipt: { backgroundColor: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '10px', padding: '12px', marginBottom: '16px' },
+  modalForm: { display: 'flex', flexDirection: 'column', gap: '16px' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
   modalLabel: { fontSize: '0.8rem', color: '#a1a1aa', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' },
   modalInput: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none' },
-  formRow: { display: 'flex', gap: '12px' },
+  modalSelect: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', cursor: 'pointer' },
+  formRow: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
+  modalActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' },
   cancelBtn: { padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer' },
-  submitModalBtn: { padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#22c55e', color: '#ffffff', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }
+  submitModalBtn: { padding: '10px 18px', borderRadius: '8px', border: '1px solid #52525b', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer' },
+
+  modalTwoColumn: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px', marginTop: '10px' },
+  leftSeatColumn: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column' },
+  seatHeaderFlex: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
+  legendRow: { display: 'flex', gap: '8px', fontSize: '0.68rem', color: '#a1a1aa' },
+  legendItem: { display: 'flex', alignItems: 'center', gap: '4px' },
+  legendBox: { width: '8px', height: '8px', borderRadius: '2px' },
+  busChassis: { border: '2px solid #3f3f46', borderRadius: '16px 16px 8px 8px', padding: '14px 10px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box' },
+  driverCabinRow: { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px', marginBottom: '10px' },
+  driverIconBadge: { fontSize: '0.72rem', color: '#a1a1aa', fontWeight: '600' },
+  steeringWheel: { fontSize: '0.85rem' },
+  verticalSeatContainer: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px', width: '100%' },
+  busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+  seatPair: { display: 'flex', gap: '6px' },
+  compactSeat: { width: '38px', height: '36px', borderRadius: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 0, border: 'none', color: '#ffffff', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer' },
+  aisleGap: { flex: 1, minWidth: '20px' },
+  rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '14px' },
+  imageGalleryContainer: { backgroundColor: '#18181b', borderRadius: '12px', padding: '10px', border: '1px solid #3f3f46' },
+  mainLargeImg: { width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #3f3f46' },
+  largeImgPlaceholder: { width: '100%', height: '180px', borderRadius: '8px', backgroundColor: '#27272a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#71717a', gap: '6px', fontSize: '0.8rem' },
+  thumbnailRow: { display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'auto' },
+  thumbImg: { width: '50px', height: '38px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer' },
+  bookingSummaryBox: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46' }
 };

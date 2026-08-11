@@ -23,7 +23,8 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   password: { type: String, required: true },
   role: { type: String, default: 'user', enum: ['user', 'admin'] },
-  joined: { type: Date, default: Date.now }
+  joined: { type: Date, default: Date.now },
+  avatar: { type: String, default: '' }
 });
 
 const User = mongoose.model('User', userSchema);
@@ -48,15 +49,19 @@ const busSchema = new mongoose.Schema({
 const Bus = mongoose.model('Bus', busSchema);
 
 const ticketSchema = new mongoose.Schema({
+  id: String,
   userEmail: String,
   userPhone: String,
   passengerEmail: String,
   passengerPhone: String,
+  passengerName: String,
   busName: String,
   operator: String,
   from: String,
   to: String,
+  route: String,
   seats: Array,
+  seatNumber: String,
   fare: mongoose.Schema.Types.Mixed,
   price: mongoose.Schema.Types.Mixed,
   paymentMethod: String,
@@ -64,14 +69,15 @@ const ticketSchema = new mongoose.Schema({
   trxId: String,
   transactionId: String,
   date: String,
-  bookingDate: String
+  bookingDate: String,
+  purchaseDate: String
 });
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
 
 // --- 3. API Routes ---
 
-// Sign Up Route (Saves new user to MongoDB)
+// Sign Up Route
 app.post('/api/signup', async (req, res) => {
   try {
     const { name, email, phone, password, role } = req.body;
@@ -106,7 +112,6 @@ app.post('/api/signup', async (req, res) => {
         _id: newUser._id,
         name: newUser.name,
         email: newUser.email,
-        emailOrPhone: newUser.email,
         phone: newUser.phone,
         role: newUser.role,
         joined: newUser.joined
@@ -121,7 +126,7 @@ app.post('/api/signup', async (req, res) => {
 // Sign In Route
 app.post('/api/signin', async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
@@ -147,10 +152,10 @@ app.post('/api/signin', async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        emailOrPhone: user.email,
         phone: user.phone,
         role: user.role,
-        joined: user.joined
+        joined: user.joined,
+        avatar: user.avatar
       }
     });
   } catch (error) {
@@ -159,7 +164,7 @@ app.post('/api/signin', async (req, res) => {
   }
 });
 
-// Fetch All Users Route (For Admin Panel)
+// Fetch All Users Route (Admin Panel)
 app.get('/api/users', async (req, res) => {
   try {
     const users = await User.find({}, '-password').sort({ joined: -1 }).lean();
@@ -195,6 +200,22 @@ app.post('/api/buses', async (req, res) => {
   }
 });
 
+// Update Bus / Seat Reservation Route
+app.put('/api/buses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let updatedBus;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      updatedBus = await Bus.findByIdAndUpdate(id, { $set: req.body }, { new: true });
+    } else {
+      updatedBus = await Bus.findOneAndUpdate({ id: Number(id) }, { $set: req.body }, { new: true });
+    }
+    res.status(200).json(updatedBus);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update bus seat layout' });
+  }
+});
+
 app.delete('/api/buses/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -216,6 +237,16 @@ app.get('/api/tickets', async (req, res) => {
     res.status(200).json(tickets);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch tickets' });
+  }
+});
+
+app.post('/api/tickets', async (req, res) => {
+  try {
+    const newTicket = new Ticket(req.body);
+    await newTicket.save();
+    res.status(201).json(newTicket);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to save ticket transaction' });
   }
 });
 
