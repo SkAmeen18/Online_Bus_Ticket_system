@@ -96,7 +96,8 @@ app.post('/api/signup', async (req, res) => {
         name: newUser.name,
         email: newUser.email,
         phone: newUser.phone,
-        role: newUser.role
+        role: newUser.role,
+        joined: newUser.joined
       }
     });
   } catch (error) {
@@ -139,7 +140,8 @@ app.post('/api/signin', async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
-        role: user.role
+        role: user.role,
+        joined: user.joined
       }
     });
   } catch (error) {
@@ -148,7 +150,18 @@ app.post('/api/signin', async (req, res) => {
   }
 });
 
-// 3. Bus Management Routes
+// 3. Get All Users (For Admin Dashboard & Synchronization)
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await User.find({}, '-password'); // Exclude password field for security
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Fetch users error:', error);
+    res.status(500).json({ message: 'Failed to fetch registered users.' });
+  }
+});
+
+// 4. Bus Management Routes
 app.get('/api/buses', async (req, res) => {
   try {
     const buses = await Bus.find();
@@ -165,6 +178,38 @@ app.post('/api/buses', async (req, res) => {
     res.status(201).json(newBus);
   } catch (error) {
     res.status(500).json({ message: 'Failed to save new bus route.' });
+  }
+});
+
+// 5. Ticket Management Routes
+app.get('/api/tickets', async (req, res) => {
+  try {
+    const { email } = req.query;
+    const query = email ? { userEmail: email.toLowerCase() } : {};
+    const tickets = await Ticket.find(query);
+    res.status(200).json(tickets);
+  } catch (error) {
+    console.error('Fetch tickets error:', error);
+    res.status(500).json({ message: 'Failed to fetch ticket records.' });
+  }
+});
+
+app.post('/api/tickets', async (req, res) => {
+  try {
+    const newTicket = new Ticket(req.body);
+    await newTicket.save();
+
+    // Optionally update booked seats in corresponding Bus document
+    if (req.body.busId && req.body.seats) {
+      await Bus.findByIdAndUpdate(req.body.busId, {
+        $push: { bookedSeats: { $each: req.body.seats } }
+      });
+    }
+
+    res.status(201).json({ message: 'Ticket booked successfully!', ticket: newTicket });
+  } catch (error) {
+    console.error('Book ticket error:', error);
+    res.status(500).json({ message: 'Failed to book ticket.' });
   }
 });
 

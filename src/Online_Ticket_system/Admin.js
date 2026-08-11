@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Bus,
   PlusCircle,
@@ -31,7 +31,8 @@ import {
   AlertCircle,
   MapPin,
   Receipt,
-  CheckCircle2
+  CheckCircle2,
+  Search
 } from 'lucide-react';
 
 const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
@@ -48,14 +49,14 @@ const BANGLADESH_DISTRICTS = [
 ];
 
 const BUS_TYPES = [
-  'Sleeper Class AC Coach ',
-  'Business / VIP Class AC Coach ',
+  'Sleeper Class AC Coach',
+  'Business / VIP Class AC Coach',
   'Premium Recliner AC Coach',
-  'Standard Executive AC Coach ',
-  'BRTC Double-Decker Highway Bus ',
-  'Standard Non-AC Highway Coach ',
-  'Economy / High-Density Non-AC Bus ',
-  'Mini / Hilly Route Regional Coach '
+  'Standard Executive AC Coach',
+  'BRTC Double-Decker Highway Bus',
+  'Standard Non-AC Highway Coach',
+  'Economy / High-Density Non-AC Bus',
+  'Mini / Hilly Route Regional Coach'
 ];
 
 const SEAT_OPTIONS = [20, 24, 28, 32, 36, 40, 52];
@@ -99,6 +100,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   const [selectedUserHistory, setSelectedUserHistory] = useState(null);
   const [selectedBusDetails, setSelectedBusDetails] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
 
   const [profileImage, setProfileImage] = useState(() => {
     return localStorage.getItem(`avatar_${user?.emailOrPhone || 'admin'}`) || null;
@@ -116,7 +118,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   });
   const [editMsg, setEditMsg] = useState({ type: '', text: '' });
 
-  // Sync data with backend API & localStorage fallback
+  // Fetch buses & Sync local storage state
   useEffect(() => {
     const fetchBuses = async () => {
       try {
@@ -149,12 +151,26 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   }, [buses]);
 
   const totalTicketsSold = ticketSales.length;
-  const totalRevenue = ticketSales.reduce((acc, item) => {
-    const price = typeof item.fare === 'number'
-      ? item.fare
-      : parseInt(String(item.fare || '0').replace(/[^0-9]/g, ''), 10) || 0;
-    return acc + price;
-  }, 0);
+  const totalRevenue = useMemo(() => {
+    return ticketSales.reduce((acc, item) => {
+      const price = typeof item.fare === 'number'
+        ? item.fare
+        : parseInt(String(item.fare || '0').replace(/[^0-9]/g, ''), 10) || 0;
+      return acc + price;
+    }, 0);
+  }, [ticketSales]);
+
+  // Passenger search filtering
+  const filteredUsers = useMemo(() => {
+    if (!userSearchTerm.trim()) return registeredUsers;
+    const term = userSearchTerm.toLowerCase();
+    return registeredUsers.filter((u) =>
+      (u.name && u.name.toLowerCase().includes(term)) ||
+      (u.email && u.email.toLowerCase().includes(term)) ||
+      (u.emailOrPhone && u.emailOrPhone.toLowerCase().includes(term)) ||
+      (u.phone && u.phone.includes(term))
+    );
+  }, [registeredUsers, userSearchTerm]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newBus, setNewBus] = useState(INITIAL_FORM_STATE);
@@ -165,7 +181,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   };
 
   const handleBusImagesUpload = (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
     const filePromises = files.map((file) => {
@@ -192,7 +208,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   };
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -205,7 +221,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   };
 
   const handleModalPhotoChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -266,9 +282,64 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     setIsEditModalOpen(false);
   };
 
-  const handleDeleteBus = (e, id) => {
+  const handleDeleteBus = async (e, id) => {
     e.stopPropagation();
-    setBuses(buses.filter((bus) => bus.id !== id && bus._id !== id));
+    if (!window.confirm('Are you sure you want to delete this bus route?')) return;
+
+    try {
+      await fetch(`${API_BASE}/buses/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Backend server unavailable, deleting locally.');
+    }
+
+    setBuses((prev) => prev.filter((bus) => bus.id !== id && bus._id !== id));
+  };
+
+  // Toggle seat booking state directly as admin
+  const handleToggleSeatAdmin = (seatId) => {
+    if (!selectedBusDetails) return;
+
+    const currentBooked = selectedBusDetails.bookedSeats || [];
+    const isBooked = currentBooked.includes(seatId);
+
+    const updatedBooked = isBooked
+      ? currentBooked.filter((s) => s !== seatId)
+      : [...currentBooked, seatId];
+
+    const updatedBus = { ...selectedBusDetails, bookedSeats: updatedBooked };
+
+    setSelectedBusDetails(updatedBus);
+    setBuses((prevBuses) =>
+      prevBuses.map((b) =>
+        (b._id || b.id) === (selectedBusDetails._id || selectedBusDetails.id) ? updatedBus : b
+      )
+    );
+  };
+
+  // Export Registered Users to CSV
+  const handleExportUsersCSV = () => {
+    if (!registeredUsers.length) {
+      alert('No user data available to export.');
+      return;
+    }
+
+    const headers = ['User ID', 'Name', 'Email', 'Phone', 'Joined Date'];
+    const rows = registeredUsers.map((u, idx) => [
+      `USR-${String(idx + 1).padStart(3, '0')}`,
+      `"${u.name || 'N/A'}"`,
+      `"${u.email || u.emailOrPhone || 'N/A'}"`,
+      `"${u.phone || 'N/A'}"`,
+      `"${u.joined ? String(u.joined).split('T')[0] : 'N/A'}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Registered_Passengers_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleAddBusSubmit = async (e) => {
@@ -359,7 +430,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
               <div style={styles.statIconWrapper}><Ticket size={22} color="#a1a1aa" /></div>
               <div>
                 <h3 style={styles.statValue}>{totalTicketsSold} Tickets</h3>
-                <span style={styles.statLabel}>Sold Today</span>
+                <span style={styles.statLabel}>Total Tickets Sold</span>
               </div>
             </div>
 
@@ -385,9 +456,9 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
               </div>
             ) : (
               <div style={styles.routeGrid}>
-                {buses.map((bus) => (
+                {buses.map((bus, idx) => (
                   <div
-                    key={bus._id || bus.id}
+                    key={bus._id || bus.id || idx}
                     style={styles.routeBox}
                     onClick={() => { setSelectedBusDetails(bus); setActiveImageIndex(0); }}
                   >
@@ -400,7 +471,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                           <span>No Image Attached</span>
                         </div>
                       )}
-                      <span style={styles.boxIdTag}>#{bus.id || String(bus._id).slice(-4)}</span>
+                      <span style={styles.boxIdTag}>#{bus.id || String(bus._id || idx).slice(-4)}</span>
                       <button
                         style={styles.boxDeleteBtn}
                         title="Delete Route"
@@ -550,18 +621,31 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                   </span>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={styles.countBadge}>{registeredUsers.length} Active Accounts</span>
-                <button style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#18181b', color: '#a1a1aa', border: '1px solid #3f3f46', padding: '6px 12px', borderRadius: '8px', fontSize: '0.78rem', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={styles.searchWrapper}>
+                  <Search size={14} color="#71717a" style={styles.searchIcon} />
+                  <input
+                    type="text"
+                    placeholder="Search passenger..."
+                    value={userSearchTerm}
+                    onChange={(e) => setUserSearchTerm(e.target.value)}
+                    style={styles.searchInput}
+                  />
+                </div>
+                <span style={styles.countBadge}>{filteredUsers.length} Active Accounts</span>
+                <button
+                  onClick={handleExportUsersCSV}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#18181b', color: '#a1a1aa', border: '1px solid #3f3f46', padding: '6px 12px', borderRadius: '8px', fontSize: '0.78rem', cursor: 'pointer' }}
+                >
                   <Download size={14} /> Export CSV
                 </button>
               </div>
             </div>
 
-            {registeredUsers.length === 0 ? (
+            {filteredUsers.length === 0 ? (
               <div style={styles.emptyBox}>
                 <Users size={36} color="#71717a" />
-                <p>No registered passengers recorded in the database.</p>
+                <p>{userSearchTerm ? 'No matching passengers found.' : 'No registered passengers recorded in the database.'}</p>
               </div>
             ) : (
               <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid #3f3f46' }}>
@@ -578,7 +662,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {registeredUsers.map((u, index) => {
+                    {filteredUsers.map((u, index) => {
                       const serialId = `USR-${String(index + 1).padStart(3, '0')}`;
                       return (
                         <tr key={u.id || u._id || index} style={styles.tr}>
@@ -590,10 +674,10 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                               <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#3f3f46', color: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: '700' }}>
                                 {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
                               </div>
-                              {u.name}
+                              {u.name || 'Unnamed Passenger'}
                             </div>
                           </td>
-                          <td style={styles.td}>{u.email || u.emailOrPhone}</td>
+                          <td style={styles.td}>{u.email || u.emailOrPhone || 'N/A'}</td>
                           <td style={styles.td}>{u.phone || '+880 17XXX-XXXXXX'}</td>
                           <td style={styles.td}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#a1a1aa' }}>
@@ -934,7 +1018,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                   </div>
                 </div>
 
-                <div style={styles.adminNoteText}>* Admin Status Toggle Disabled</div>
+                <div style={styles.adminNoteText}>* Click any seat to toggle reservation status</div>
 
                 <div style={styles.busChassis}>
                   <div style={styles.driverCabinRow}>
@@ -956,16 +1040,18 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                         <div key={rowLetter} style={styles.busRowGroup}>
                           <div style={styles.seatPair}>
                             {[s1, s2].map((seatId) => (
-                              <div
+                              <button
                                 key={seatId}
+                                type="button"
                                 style={{
                                   ...styles.compactSeat,
                                   backgroundColor: isBooked(seatId) ? '#6b7280' : '#22c55e',
                                 }}
-                                title={isBooked(seatId) ? `Seat ${seatId}: Booked` : `Seat ${seatId}: Available`}
+                                onClick={() => handleToggleSeatAdmin(seatId)}
+                                title={`Click to toggle seat ${seatId}`}
                               >
                                 {seatId}
-                              </div>
+                              </button>
                             ))}
                           </div>
 
@@ -973,16 +1059,18 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
                           <div style={styles.seatPair}>
                             {[s3, s4].map((seatId) => (
-                              <div
+                              <button
                                 key={seatId}
+                                type="button"
                                 style={{
                                   ...styles.compactSeat,
                                   backgroundColor: isBooked(seatId) ? '#6b7280' : '#22c55e',
                                 }}
-                                title={isBooked(seatId) ? `Seat ${seatId}: Booked` : `Seat ${seatId}: Available`}
+                                onClick={() => handleToggleSeatAdmin(seatId)}
+                                title={`Click to toggle seat ${seatId}`}
                               >
                                 {seatId}
-                              </div>
+                              </button>
                             ))}
                           </div>
                         </div>
@@ -1421,6 +1509,10 @@ const styles = {
   countBadge: { backgroundColor: '#3f3f46', color: '#a1a1aa', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '20px', fontWeight: '600' },
   addBtn: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#3f3f46', color: '#ffffff', border: '1px solid #52525b', padding: '10px 18px', borderRadius: '10px', fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer' },
 
+  searchWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
+  searchIcon: { position: 'absolute', left: '10px' },
+  searchInput: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '8px', padding: '6px 12px 6px 30px', color: '#ffffff', fontSize: '0.8rem', outline: 'none', width: '160px' },
+
   routeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
   routeBox: {
     backgroundColor: '#18181b',
@@ -1480,8 +1572,8 @@ const styles = {
     marginBottom: '4px'
   },
   adminNoteText: {
-    fontSize: '0.65rem',
-    color: '#ef4444',
+    fontSize: '0.68rem',
+    color: '#38bdf8',
     fontStyle: 'italic',
     marginBottom: '12px'
   },
@@ -1558,13 +1650,15 @@ const styles = {
     textAlign: 'center',
     padding: 0,
     margin: 0,
+    border: 'none',
     lineHeight: 'normal',
     color: '#ffffff',
     fontSize: '0.8rem',
     fontWeight: '700',
-    cursor: 'not-allowed',
+    cursor: 'pointer',
     boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)',
-    userSelect: 'none'
+    userSelect: 'none',
+    transition: 'opacity 0.15s ease'
   },
   aisleGap: {
     flex: 1,

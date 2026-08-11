@@ -34,7 +34,6 @@ const BANGLADESH_DISTRICTS = [
   'Satkhira', 'Shariatpur', 'Sherpur', 'Sirajganj', 'Sunamganj', 'Sylhet', 'Tangail', 'Thakurgaon'
 ];
 
-// Helper to ensure time string always includes AM/PM
 const formatTimeWithAmPm = (timeStr) => {
   if (!timeStr || timeStr === 'N/A') return 'N/A';
   
@@ -61,12 +60,10 @@ export default function User({ activeTab = 'Home', user = {} }) {
   const [searchFrom, setSearchFrom] = useState('All Districts');
   const [searchTo, setSearchTo] = useState('All Districts');
   
-  // Selection & Booking States
   const [selectedBus, setSelectedBus] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // Payment & Checkout States
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('bKash');
   const [passenger, setPassenger] = useState({
@@ -77,7 +74,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
   });
   const [bookingSuccess, setBookingSuccess] = useState(null);
 
-  // Profile States
   const [currentUserData, setCurrentUserData] = useState({
     name: user?.name || 'Passenger User',
     phone: user?.phone || '01700000000',
@@ -88,7 +84,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', avatar: '' });
 
-  // Password Change States
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -98,9 +93,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
   const [userPaymentHistory, setUserPaymentHistory] = useState([]);
 
-  // Sync & Load Data for Logged-In User
   const loadData = useCallback(() => {
-    // 1. Buses Load
     const savedBuses = localStorage.getItem('app_buses');
     if (savedBuses) {
       try {
@@ -113,13 +106,13 @@ export default function User({ activeTab = 'Home', user = {} }) {
       setBuses([]);
     }
 
-    // 2. User Info Sync
     const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
     const activeEmail = user?.emailOrPhone || user?.email || 'passenger@onlinebus.bd';
     const activePhone = user?.phone || '01700000000';
 
     const foundUser = loadedUsers.find(
-      (u) => u.email === activeEmail || u.phone === activePhone
+      (u) => (u.email && u.email.toLowerCase() === activeEmail.toLowerCase()) || 
+             (u.phone && u.phone === activePhone)
     );
 
     const currentUser = {
@@ -138,7 +131,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
       avatar: currentUser.avatar
     });
 
-    // 3. USER-SPECIFIC PAYMENT HISTORY FILTERING
     const allTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
     
     const filteredUserTickets = allTickets.filter((ticket) => {
@@ -162,7 +154,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     return () => window.removeEventListener('storage', handleStorage);
   }, [loadData]);
 
-  // Image Upload Handler (Convert to Base64)
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -178,13 +169,12 @@ export default function User({ activeTab = 'Home', user = {} }) {
     }
   };
 
-  // Save Updated Profile
   const handleSaveProfile = (e) => {
     e.preventDefault();
     const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
     
     const updatedUsers = loadedUsers.map((u) => {
-      if (u.email === currentUserData.email || u.phone === currentUserData.phone) {
+      if ((u.email && u.email.toLowerCase() === currentUserData.email.toLowerCase()) || u.phone === currentUserData.phone) {
         return { 
           ...u, 
           name: editForm.name, 
@@ -202,7 +192,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     alert('Profile updated successfully!');
   };
 
-  // Password Change Handler
   const handleChangePassword = (e) => {
     e.preventDefault();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -216,7 +205,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
     const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
     const userIndex = loadedUsers.findIndex(
-      (u) => u.email === currentUserData.email || u.phone === currentUserData.phone
+      (u) => (u.email && u.email.toLowerCase() === currentUserData.email.toLowerCase()) || u.phone === currentUserData.phone
     );
 
     if (userIndex !== -1) {
@@ -233,7 +222,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     setIsChangingPassword(false);
   };
 
-  // Filter Buses by Departure & Destination
   const filteredBuses = buses.filter((bus) => {
     const matchesFrom = searchFrom === 'All Districts' || bus.from?.toLowerCase() === searchFrom.toLowerCase();
     const matchesTo = searchTo === 'All Districts' || bus.to?.toLowerCase() === searchTo.toLowerCase();
@@ -325,7 +313,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
     setBuses(updatedBuses);
     
     const userOnly = updatedTickets.filter(
-      (t) => t.userEmail?.toLowerCase() === currentUserData.email.toLowerCase() || t.passengerPhone === currentUserData.phone
+      (t) => (t.userEmail && t.userEmail.toLowerCase() === currentUserData.email.toLowerCase()) || t.passengerPhone === currentUserData.phone
     );
     setUserPaymentHistory([...userOnly].reverse());
 
@@ -364,7 +352,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
             <div style={styles.searchRow}>
               <div style={styles.searchField}>
-                <label style={styles.searchLabel}><MapPin size={14} color="#3f3f46" /> From District</label>
+                <label style={styles.searchLabel}><MapPin size={14} color="#a1a1aa" /> From District</label>
                 <select 
                   value={searchFrom} 
                   onChange={(e) => setSearchFrom(e.target.value)}
@@ -377,7 +365,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
               </div>
 
               <div style={styles.searchField}>
-                <label style={styles.searchLabel}><MapPin size={14} color="#3f3f46" /> To District</label>
+                <label style={styles.searchLabel}><MapPin size={14} color="#a1a1aa" /> To District</label>
                 <select 
                   value={searchTo} 
                   onChange={(e) => setSearchTo(e.target.value)}
@@ -399,7 +387,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
           </div>
 
           <div style={styles.sectionHeader}>
-            {/* UPDATED: Title changed from Available Bus Fleets to Available Bus Routes */}
             <h3 style={styles.sectionTitle}>Available Bus Routes ({filteredBuses.length})</h3>
             <span style={styles.liveSyncBadge}>● Live Real-Time Availability</span>
           </div>
@@ -435,25 +422,21 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     <div style={styles.cardBody}>
                       <div>
                         <span style={styles.operatorTag}>{bus.name}</span>
-                        
-                        {/* UPDATED: Bus route on top, Bus type badge placed ALWAYS under it */}
                         <div style={styles.routeHeaderRow}>
                           <h4 style={styles.routeTitle}>{bus.route || `${bus.from} to ${bus.to}`}</h4>
                           <span style={styles.busTypeBadgeUnder}>Standard Executive AC Coach (36 seats)</span>
                         </div>
-
                         <span style={styles.coachNumber}>Coach No: {bus.busNumber || 'N/A'}</span>
                       </div>
 
-                      {/* UPDATED: Times formatted with AM/PM */}
                       <div style={styles.timeInfoRow}>
                         <div style={styles.timeBlock}>
                           <Clock size={13} color="#a1a1aa" />
-                          <span>Arrival to terminal time: <strong>{formatTimeWithAmPm(bus.arrivalTime)}</strong></span>
+                          <span>Arrival: <strong>{formatTimeWithAmPm(bus.arrivalTime)}</strong></span>
                         </div>
                         <div style={styles.timeBlock}>
                           <Clock size={13} color="#a1a1aa" />
-                          <span>Departure time: <strong>{formatTimeWithAmPm(bus.departureTime)}</strong></span>
+                          <span>Departure: <strong>{formatTimeWithAmPm(bus.departureTime)}</strong></span>
                         </div>
                       </div>
 
@@ -488,7 +471,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       {(currentTab === 'about') && (
         <div style={styles.contentSection}>
           <div style={styles.aboutHeader}>
-            <Bus size={44} color="#3f3f46" />
+            <Bus size={44} color="#ffffff" />
             <div>
               <h2 style={{ margin: 0, color: '#f4f4f5' }}>About Online Bus Bangladesh</h2>
               <p style={{ margin: '4px 0 0 0', color: '#a1a1aa' }}>
@@ -514,7 +497,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
             </div>
 
             <div style={styles.aboutCard}>
-              <CreditCard size={32} color="#3f3f46" />
+              <CreditCard size={32} color="#38bdf8" />
               <h4 style={styles.aboutCardTitle}>Instant Mobile Payment</h4>
               <p style={styles.aboutCardText}>
                 Complete transactions in seconds using bKash, Nagad, Rocket, or cards.
@@ -530,7 +513,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
             </div>
 
             <div style={styles.aboutCard}>
-              <HelpCircle size={32} color="#38bdf8" />
+              <HelpCircle size={32} color="#a855f7" />
               <h4 style={styles.aboutCardTitle}>24/7 Dedicated Support</h4>
               <p style={styles.aboutCardText}>
                 Our support team is online round-the-clock to keep your journey smooth.
@@ -550,13 +533,13 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 <img src={currentUserData.avatar} alt="Profile" style={styles.avatarImg} />
               ) : (
                 <div style={styles.avatarLarge}>
-                  <UserIcon size={40} color="#3f3f46" />
+                  <UserIcon size={40} color="#a1a1aa" />
                 </div>
               )}
             </div>
             <div>
               <h2 style={{ margin: 0, color: '#f4f4f5' }}>{currentUserData.name}</h2>
-              <span style={{ fontSize: '0.85rem', color: '#3f3f46', fontWeight: '700' }}>
+              <span style={{ fontSize: '0.85rem', color: '#22c55e', fontWeight: '700' }}>
                 {currentUserData.role || 'Passenger Account'}
               </span>
             </div>
@@ -576,7 +559,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
               <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 
                 <div style={styles.fieldGroup}>
-                  <label style={styles.modalLabel}><Camera size={14} color="#3f3f46" /> Profile Photo</label>
+                  <label style={styles.modalLabel}><Camera size={14} color="#a1a1aa" /> Profile Photo</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     {editForm.avatar ? (
                       <img src={editForm.avatar} alt="Preview" style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #3f3f46' }} />
@@ -595,7 +578,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 </div>
 
                 <div style={styles.fieldGroup}>
-                  <label style={styles.modalLabel}><UserIcon size={14} color="#3f3f46" /> Full Name</label>
+                  <label style={styles.modalLabel}><UserIcon size={14} color="#a1a1aa" /> Full Name</label>
                   <input 
                     type="text" 
                     value={editForm.name} 
@@ -607,7 +590,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                 <div style={styles.formRow}>
                   <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                    <label style={styles.modalLabel}><Phone size={14} color="#3f3f46" /> Phone Number</label>
+                    <label style={styles.modalLabel}><Phone size={14} color="#a1a1aa" /> Phone Number</label>
                     <input 
                       type="text" 
                       value={editForm.phone} 
@@ -618,7 +601,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                   </div>
 
                   <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                    <label style={styles.modalLabel}><Mail size={14} color="#3f3f46" /> Email Address</label>
+                    <label style={styles.modalLabel}><Mail size={14} color="#a1a1aa" /> Email Address</label>
                     <input 
                       type="email" 
                       value={editForm.email} 
@@ -683,7 +666,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
             {isChangingPassword ? (
               <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={styles.fieldGroup}>
-                  <label style={styles.modalLabel}><Lock size={14} color="#3f3f46" /> Current Password</label>
+                  <label style={styles.modalLabel}><Lock size={14} color="#a1a1aa" /> Current Password</label>
                   <input 
                     type="password" 
                     placeholder="Enter current password"
@@ -696,7 +679,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                 <div style={styles.formRow}>
                   <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                    <label style={styles.modalLabel}><Lock size={14} color="#3f3f46" /> New Password</label>
+                    <label style={styles.modalLabel}><Lock size={14} color="#a1a1aa" /> New Password</label>
                     <input 
                       type="password" 
                       placeholder="Minimum 6 characters"
@@ -708,7 +691,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                   </div>
 
                   <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                    <label style={styles.modalLabel}><Lock size={14} color="#3f3f46" /> Confirm New Password</label>
+                    <label style={styles.modalLabel}><Lock size={14} color="#a1a1aa" /> Confirm New Password</label>
                     <input 
                       type="password" 
                       placeholder="Re-type new password"
@@ -750,7 +733,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
             <div>
               <h3 style={styles.sectionTitle}>My Payment & Booking History</h3>
               <p style={{ color: '#a1a1aa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
-                Private history of completed ticket bookings for account: <strong style={{ color: '#3f3f46' }}>{currentUserData.email}</strong>
+                Private history of completed ticket bookings for account: <strong style={{ color: '#ffffff' }}>{currentUserData.email}</strong>
               </p>
             </div>
             <span style={{ fontSize: '0.75rem', color: '#22c55e', backgroundColor: '#14532d', padding: '6px 12px', borderRadius: '8px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -772,7 +755,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 <div key={item.id || idx} style={styles.historyCard}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     <div style={styles.historyIconBox}>
-                      <Ticket size={22} color="#3f3f46" />
+                      <Ticket size={22} color="#ffffff" />
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -780,7 +763,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                         <span style={styles.ticketBadge}>{item.id}</span>
                       </div>
                       <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
-                        Route: {item.route} | Seat: <strong style={{ color: '#3f3f46' }}>{item.seatNumber}</strong>
+                        Route: {item.route} | Seat: <strong style={{ color: '#22c55e' }}>{item.seatNumber}</strong>
                       </span>
                     </div>
                   </div>
@@ -806,7 +789,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
           <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <div>
-                <h3 style={{ margin: 0, color: '#3f3f46', fontSize: '1.3rem' }}>
+                <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.3rem' }}>
                   {selectedBus.name}
                 </h3>
                 <span style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>
@@ -848,11 +831,11 @@ export default function User({ activeTab = 'Home', user = {} }) {
                       <span>Free</span>
                     </div>
                     <div style={styles.legendItem}>
-                      <div style={{ ...styles.legendBox, backgroundColor: '#3f3f46' }}></div>
+                      <div style={{ ...styles.legendBox, backgroundColor: '#3b82f6' }}></div>
                       <span>Selected</span>
                     </div>
                     <div style={styles.legendItem}>
-                      <div style={{ ...styles.legendBox, backgroundColor: '#6b7280' }}></div>
+                      <div style={{ ...styles.legendBox, backgroundColor: '#4b5563' }}></div>
                       <span>Booked</span>
                     </div>
                   </div>
@@ -878,8 +861,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
                       const isSelected = (seatId) => selectedSeats.includes(seatId);
 
                       const getSeatBg = (seatId) => {
-                        if (isBooked(seatId)) return '#6b7280';
-                        if (isSelected(seatId)) return '#3f3f46';
+                        if (isBooked(seatId)) return '#4b5563';
+                        if (isSelected(seatId)) return '#3b82f6';
                         return '#22c55e';
                       };
 
@@ -947,7 +930,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                               alt="Thumb" 
                               style={{
                                 ...styles.thumbImg,
-                                border: activeImageIndex === i ? '2px solid #3f3f46' : '1px solid #3f3f46'
+                                border: activeImageIndex === i ? '2px solid #38bdf8' : '1px solid #3f3f46'
                               }}
                               onClick={() => setActiveImageIndex(i)}
                             />
@@ -970,7 +953,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                   <div style={styles.summaryRow}>
                     <span style={styles.summaryLabel}>Selected Seats:</span>
-                    <span style={{ color: '#3f3f46', fontWeight: '700' }}>
+                    <span style={{ color: '#38bdf8', fontWeight: '700' }}>
                       {selectedSeats.length > 0 ? selectedSeats.join(', ') : 'None'}
                     </span>
                   </div>
@@ -997,7 +980,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                   <button 
                     style={{
                       ...styles.checkoutBtn,
-                      backgroundColor: selectedSeats.length > 0 ? '#3f3f46' : '#3f3f46',
+                      backgroundColor: selectedSeats.length > 0 ? '#2563eb' : '#3f3f46',
                       cursor: selectedSeats.length > 0 ? 'pointer' : 'not-allowed'
                     }}
                     disabled={selectedSeats.length === 0}
@@ -1031,19 +1014,19 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
             <form onSubmit={handleConfirmBooking} style={styles.modalForm}>
               <div style={styles.fieldGroup}>
-                <label style={styles.modalLabel}><CreditCard size={14} color="#3f3f46" /> Select Payment Method</label>
+                <label style={styles.modalLabel}><CreditCard size={14} color="#a1a1aa" /> Select Payment Method</label>
                 <div style={styles.paymentMethodGrid}>
                   {['bKash', 'Nagad', 'Rocket', 'Card'].map((method) => (
                     <div 
                       key={method}
                       style={{
                         ...styles.paymentOptionCard,
-                        borderColor: paymentMethod === method ? '#3f3f46' : '#3f3f46',
-                        backgroundColor: paymentMethod === method ? '#27272a' : '#18181b'
+                        borderColor: paymentMethod === method ? '#22c55e' : '#3f3f46',
+                        backgroundColor: paymentMethod === method ? '#14532d' : '#18181b'
                       }}
                       onClick={() => setPaymentMethod(method)}
                     >
-                      <span style={{ fontWeight: '700', color: paymentMethod === method ? '#3f3f46' : '#f4f4f5' }}>
+                      <span style={{ fontWeight: '700', color: paymentMethod === method ? '#22c55e' : '#f4f4f5' }}>
                         {method}
                       </span>
                     </div>
@@ -1052,7 +1035,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
               </div>
 
               <div style={styles.fieldGroup}>
-                <label style={styles.modalLabel}><UserIcon size={14} color="#3f3f46" /> Passenger Name</label>
+                <label style={styles.modalLabel}><UserIcon size={14} color="#a1a1aa" /> Passenger Name</label>
                 <input 
                   type="text" 
                   placeholder="Full Name" 
@@ -1065,7 +1048,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
               <div style={styles.formRow}>
                 <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}><Phone size={14} color="#3f3f46" /> Mobile Number</label>
+                  <label style={styles.modalLabel}><Phone size={14} color="#a1a1aa" /> Mobile Number</label>
                   <input 
                     type="tel" 
                     placeholder="01700000000" 
@@ -1094,7 +1077,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
               <div style={styles.finalPaySummary}>
                 <div>
                   <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Seats Chosen:</span>
-                  <div style={{ color: '#3f3f46', fontWeight: '700' }}>{selectedSeats.join(', ')}</div>
+                  <div style={{ color: '#38bdf8', fontWeight: '700' }}>{selectedSeats.join(', ')}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Amount Payable:</span>
@@ -1143,9 +1126,8 @@ const styles = {
   cardImgPlaceholder: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#71717a', gap: '6px', fontSize: '0.8rem' },
 
   cardBody: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, justifyContent: 'space-between' },
-  operatorTag: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '700', textTransform: 'uppercase' },
+  operatorTag: { fontSize: '0.75rem', color: '#38bdf8', fontWeight: '700', textTransform: 'uppercase' },
 
-  /* UPDATED: Bus route layout with coach badge ALWAYS directly underneath */
   routeHeaderRow: { display: 'flex', flexDirection: 'column', gap: '6px', margin: '4px 0 6px 0', alignItems: 'flex-start' },
   routeTitle: { fontSize: '1.1rem', fontWeight: '700', color: '#f4f4f5', margin: 0 },
   busTypeBadgeUnder: { backgroundColor: '#082f49', color: '#38bdf8', border: '1px solid #0369a1', padding: '3px 8px', borderRadius: '6px', fontWeight: '600', fontSize: '0.7rem', display: 'inline-block' },
@@ -1158,9 +1140,8 @@ const styles = {
   cardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #27272a' },
   fareLabel: { fontSize: '0.7rem', color: '#71717a', display: 'block' },
   fareValue: { fontSize: '1.1rem', fontWeight: '800', color: '#22c55e' },
-  viewSeatsBtn: { display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '8px', fontWeight: '600', fontSize: '0.8rem', cursor: 'pointer', marginTop: '4px' },
+  viewSeatsBtn: { display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '8px', fontWeight: '600', fontSize: '0.8rem', cursor: 'pointer', marginTop: '4px' },
 
-  /* MODAL & SEAT LAYOUT */
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%', maxWidth: '920px', maxHeight: '90vh', overflowY: 'auto' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' },
@@ -1215,7 +1196,6 @@ const styles = {
   summaryLabel: { color: '#a1a1aa' },
   checkoutBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#ffffff', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: '700', fontSize: '0.95rem', marginTop: '8px' },
 
-  /* PAYMENT MODAL */
   modalContent: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '100%' },
   modalForm: { display: 'flex', flexDirection: 'column', gap: '16px' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
@@ -1227,9 +1207,8 @@ const styles = {
   finalPaySummary: { backgroundColor: '#18181b', padding: '12px 16px', borderRadius: '10px', border: '1px solid #3f3f46', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   modalActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' },
   cancelBtn: { padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer' },
-  submitModalBtn: { padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer' },
+  submitModalBtn: { padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: '600', cursor: 'pointer' },
 
-  /* CONTENT SECTIONS */
   contentSection: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '20px' },
   aboutHeader: { display: 'flex', alignItems: 'center', gap: '16px' },
   aboutBannerBox: { backgroundColor: '#18181b', borderLeft: '4px solid #38bdf8', padding: '16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px' },
@@ -1250,6 +1229,6 @@ const styles = {
   infoValue: { margin: 0, color: '#f4f4f5', fontWeight: '600', fontSize: '0.95rem' },
 
   historyCard: { backgroundColor: '#18181b', border: '1px solid #3f3f46', padding: '16px 20px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  historyIconBox: { width: '42px', height: '42px', borderRadius: '10px', backgroundColor: '#27272a', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  ticketBadge: { backgroundColor: '#27272a', color: '#3f3f46', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', border: '1px solid #3f3f46' }
+  historyIconBox: { width: '42px', height: '42px', borderRadius: '10px', backgroundColor: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  ticketBadge: { backgroundColor: '#27272a', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', border: '1px solid #3f3f46' }
 };
