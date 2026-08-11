@@ -113,7 +113,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
       }
     } catch (err) {
       console.error('Error fetching buses:', err);
-    } finally {
+    } opacity: 1,
+    finally {
       setLoadingBuses(false);
     }
   }, [searchFrom, searchTo]);
