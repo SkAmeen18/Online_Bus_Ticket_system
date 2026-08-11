@@ -63,12 +63,15 @@ export default function Signin({ onLoginSuccess }) {
 
   const saveUserToLocalStorage = (userObj) => {
     const existingUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
-    const userIndex = existingUsers.findIndex((u) => u.email === userObj.email);
+    const userIndex = existingUsers.findIndex(
+      (u) => (u.email && u.email.toLowerCase() === userObj.email.toLowerCase()) || 
+             (u.phone && u.phone === userObj.phone)
+    );
 
     if (userIndex === -1) {
       existingUsers.push(userObj);
     } else {
-      existingUsers[userIndex] = userObj;
+      existingUsers[userIndex] = { ...existingUsers[userIndex], ...userObj };
     }
     localStorage.setItem('app_users', JSON.stringify(existingUsers));
   };
@@ -83,7 +86,7 @@ export default function Signin({ onLoginSuccess }) {
         setError('Please enter your Mobile Number or Email Address.');
         return;
       }
-      setSuccessMsg(`Password reset link/OTP sent to ${formData.emailOrPhone}`);
+      setSuccessMsg(`Password reset instructions sent to ${formData.emailOrPhone}`);
       return;
     }
 
@@ -110,7 +113,7 @@ export default function Signin({ onLoginSuccess }) {
           body: JSON.stringify({
             name: formData.name,
             email: formData.emailOrPhone,
-            phone: formData.phone,
+            phone: formData.phone || formData.emailOrPhone,
             password: formData.password,
             role: role,
           }),
@@ -126,25 +129,38 @@ export default function Signin({ onLoginSuccess }) {
           throw new Error(data.message || `Registration failed with status ${response.status}`);
         }
 
-        saveUserToLocalStorage(
-          data.user || {
-            id: (role === 'admin' ? 'ADM-' : 'USR-') + Math.floor(1000 + Math.random() * 9000),
-            name: formData.name,
-            email: formData.emailOrPhone,
-            phone: formData.phone,
-            password: formData.password,
-            role: role === 'admin' ? 'admin' : 'user',
-            joined: new Date().toISOString().split('T')[0],
-            status: 'Active'
-          }
-        );
+        const newUser = data.user || {
+          id: (role === 'admin' ? 'ADM-' : 'USR-') + Math.floor(1000 + Math.random() * 9000),
+          name: formData.name,
+          email: formData.emailOrPhone,
+          phone: formData.phone || '',
+          password: formData.password,
+          role: role === 'admin' ? 'admin' : 'user',
+          joined: new Date().toISOString().split('T')[0],
+          status: 'Active'
+        };
 
+        saveUserToLocalStorage(newUser);
         resetForm();
         setMode('signin');
         setSuccessMsg(`${role === 'admin' ? 'Admin' : 'Passenger'} account created successfully! You can now sign in.`);
 
       } catch (err) {
-        setError(err.message || 'Failed to communicate with database.');
+        // Fallback local save if server fails or is offline
+        const localUser = {
+          id: (role === 'admin' ? 'ADM-' : 'USR-') + Math.floor(1000 + Math.random() * 9000),
+          name: formData.name,
+          email: formData.emailOrPhone,
+          phone: formData.phone || '',
+          password: formData.password,
+          role: role === 'admin' ? 'admin' : 'user',
+          joined: new Date().toISOString().split('T')[0],
+          status: 'Active'
+        };
+        saveUserToLocalStorage(localUser);
+        resetForm();
+        setMode('signin');
+        setSuccessMsg(`Account created locally. You can now sign in.`);
       } finally {
         setLoading(false);
       }
@@ -175,11 +191,22 @@ export default function Signin({ onLoginSuccess }) {
           data = await response.json();
         }
 
-        if (!response.ok) {
-          throw new Error(data.message || 'Invalid login credentials.');
+        let authenticatedUser = null;
+
+        if (response.ok && data.user) {
+          authenticatedUser = data.user;
+        } else {
+          // Fallback to local storage lookup
+          const localUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
+          authenticatedUser = localUsers.find(
+            (u) => (u.email === formData.emailOrPhone || u.phone === formData.emailOrPhone) && u.password === formData.password
+          );
         }
 
-        const authenticatedUser = data.user;
+        if (!authenticatedUser) {
+          throw new Error('Invalid email/phone or password.');
+        }
+
         const normalizedUserRole = (authenticatedUser.role || '').toLowerCase();
 
         if (role === 'admin' && normalizedUserRole !== 'admin') {
@@ -196,7 +223,7 @@ export default function Signin({ onLoginSuccess }) {
           onLoginSuccess(authenticatedUser);
         }
       } catch (err) {
-        setError(err.message || 'Database login failed. Check credentials or server status.');
+        setError(err.message || 'Login failed. Please check your credentials.');
       } finally {
         setLoading(false);
       }
@@ -226,16 +253,16 @@ export default function Signin({ onLoginSuccess }) {
 
             <div style={styles.featureList}>
               <div style={styles.featureItem}>
-                <CheckCircle2 size={18} color="#a1a1aa" />
+                <CheckCircle2 size={18} color="#22c55e" />
                 <span>Real-time interactive seat selection</span>
               </div>
               <div style={styles.featureItem}>
-                <CheckCircle2 size={18} color="#a1a1aa" />
+                <CheckCircle2 size={18} color="#22c55e" />
                 <span>bKash, Nagad, Rocket & Card payments</span>
               </div>
               <div style={styles.featureItem}>
-                <CheckCircle2 size={18} color="#a1a1aa" />
-                <span>Instant SMS verification & E-Ticket download</span>
+                <CheckCircle2 size={18} color="#22c55e" />
+                <span>Instant confirmation & digital E-Ticket</span>
               </div>
             </div>
           </div>
@@ -458,7 +485,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#27272a',
+    backgroundColor: '#18181b',
     padding: '24px',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
@@ -470,11 +497,11 @@ const styles = {
     backgroundColor: '#ffffff',
     borderRadius: '24px',
     overflow: 'hidden',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
   },
   leftSection: {
     flex: '1',
-    backgroundColor: '#18181b',
+    backgroundColor: '#09090b',
     color: '#ffffff',
     padding: '48px 40px',
     display: 'flex',
@@ -497,49 +524,48 @@ const styles = {
   featureItem: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.875rem', color: '#e4e4e7' },
   leftFooter: { fontSize: '0.75rem', color: '#71717a' },
   rightSection: { flex: '1.1', backgroundColor: '#ffffff', padding: '40px 36px', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
-  roleToggle: { display: 'flex', backgroundColor: '#3f3f46', borderRadius: '12px', padding: '4px', marginBottom: '20px' },
+  roleToggle: { display: 'flex', backgroundColor: '#f4f4f5', borderRadius: '12px', padding: '4px', marginBottom: '20px', border: '1px solid #e4e4e7' },
   roleBtn: {
     flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px',
-    padding: '8px 0',
+    padding: '10px 0',
     fontSize: '0.85rem',
     fontWeight: '600',
     border: 'none',
     borderRadius: '8px',
     backgroundColor: 'transparent',
-    color: '#ffffff',
-    opacity: 0.75,
+    color: '#71717a',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
-  activeRole: { backgroundColor: '#18181b', color: '#ffffff', opacity: 1 },
+  activeRole: { backgroundColor: '#18181b', color: '#ffffff' },
   formHeader: { marginBottom: '16px' },
   formTitle: { fontSize: '1.4rem', fontWeight: '700', color: '#18181b', margin: '0 0 4px 0' },
   formSubtext: { fontSize: '0.85rem', color: '#71717a', margin: 0 },
-  errorAlert: { backgroundColor: '#3f3f46', color: '#ffffff', padding: '10px 14px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px' },
-  successAlert: { backgroundColor: '#15803d', color: '#ffffff', padding: '10px 14px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px' },
+  errorAlert: { backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px' },
+  successAlert: { backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px' },
   form: { display: 'flex', flexDirection: 'column', gap: '12px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
   label: { fontSize: '0.75rem', fontWeight: '700', color: '#18181b', textTransform: 'uppercase', letterSpacing: '0.5px' },
   inputWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
-  inputIcon: { position: 'absolute', left: '12px', color: '#a1a1aa' },
+  inputIcon: { position: 'absolute', left: '12px', color: '#71717a' },
   input: {
     width: '100%',
     padding: '10px 12px 10px 38px',
     borderRadius: '10px',
-    border: '1px solid #e4e4e7',
-    backgroundColor: '#fefefe',
+    border: '1px solid #d4d4d8',
+    backgroundColor: '#ffffff',
     fontSize: '0.9rem',
     outline: 'none',
     boxSizing: 'border-box',
     color: '#18181b',
   },
   forgotRow: { display: 'flex', justifyContent: 'flex-end', marginTop: '2px' },
-  forgotBtn: { background: 'none', border: 'none', color: '#3f3f46', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', padding: '2px 0' },
-  eyeBtn: { position: 'absolute', right: '12px', background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer' },
+  forgotBtn: { background: 'none', border: 'none', color: '#18181b', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', padding: '2px 0' },
+  eyeBtn: { position: 'absolute', right: '12px', background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' },
   submitBtn: {
     display: 'flex',
     alignItems: 'center',

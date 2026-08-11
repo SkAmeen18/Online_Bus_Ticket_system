@@ -31,25 +31,26 @@ const User = mongoose.model('User', userSchema);
 
 const busSchema = new mongoose.Schema({
   id: Number,
-  name: String,
-  busNumber: String,
-  from: String,
-  to: String,
-  route: String,
-  fare: String,
-  seats: Number,
-  bookedSeats: [String],
-  busType: String,
-  arrivalTime: String,
-  departureTime: String,
-  estimatedHours: String,
-  images: [String]
-});
+  name: { type: String, required: true },
+  busNumber: { type: String, default: '' },
+  from: { type: String, required: true },
+  to: { type: String, required: true },
+  route: { type: String, default: '' },
+  fare: { type: String, required: true },
+  seats: { type: Number, default: 36 },
+  bookedSeats: { type: [String], default: [] },
+  busType: { type: String, default: 'AC Executive' },
+  arrivalTime: { type: String, default: 'N/A' },
+  departureTime: { type: String, default: 'N/A' },
+  estimatedHours: { type: String, default: 'N/A' },
+  images: { type: [String], default: [] }
+}, { timestamps: true });
 
 const Bus = mongoose.model('Bus', busSchema);
 
 const ticketSchema = new mongoose.Schema({
   id: String,
+  busId: String,
   userEmail: String,
   userPhone: String,
   passengerEmail: String,
@@ -60,18 +61,14 @@ const ticketSchema = new mongoose.Schema({
   from: String,
   to: String,
   route: String,
-  seats: Array,
+  seats: [String],
   seatNumber: String,
   fare: mongoose.Schema.Types.Mixed,
   price: mongoose.Schema.Types.Mixed,
   paymentMethod: String,
-  gateway: String,
   trxId: String,
-  transactionId: String,
-  date: String,
-  bookingDate: String,
-  purchaseDate: String
-});
+  purchaseDate: { type: String, default: () => new Date().toLocaleString() }
+}, { timestamps: true });
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
 
@@ -164,6 +161,24 @@ app.post('/api/signin', async (req, res) => {
   }
 });
 
+// User Profile Update Route
+app.put('/api/users/profile', async (req, res) => {
+  try {
+    const { email, name, phone, avatar } = req.body;
+    if (!email) return res.status(400).json({ message: 'User email is required' });
+
+    const updatedUser = await User.findOneAndUpdate(
+      { email: email.trim().toLowerCase() },
+      { $set: { name, phone, avatar } },
+      { new: true, select: '-password' }
+    );
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update user profile' });
+  }
+});
+
 // Fetch All Users Route (Admin Panel)
 app.get('/api/users', async (req, res) => {
   try {
@@ -183,7 +198,17 @@ app.get('/api/users', async (req, res) => {
 // Buses Routes
 app.get('/api/buses', async (req, res) => {
   try {
-    const buses = await Bus.find({});
+    const { from, to } = req.query;
+    let query = {};
+
+    if (from && from !== 'All Districts') {
+      query.from = new RegExp(`^${from.trim()}$`, 'i');
+    }
+    if (to && to !== 'All Districts') {
+      query.to = new RegExp(`^${to.trim()}$`, 'i');
+    }
+
+    const buses = await Bus.find(query).sort({ createdAt: -1 });
     res.status(200).json(buses);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch buses' });
@@ -192,23 +217,33 @@ app.get('/api/buses', async (req, res) => {
 
 app.post('/api/buses', async (req, res) => {
   try {
-    const newBus = new Bus(req.body);
+    const busData = req.body;
+    if (!busData.route) {
+      busData.route = `${busData.from} to ${busData.to}`;
+    }
+    const newBus = new Bus(busData);
     await newBus.save();
     res.status(201).json(newBus);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to add bus' });
+    console.error('Create bus error:', error);
+    res.status(500).json({ message: 'Failed to add bus route' });
   }
 });
 
-// Update Bus / Seat Reservation Route
+// Update Bus / Reserve Seats Route
 app.put('/api/buses/:id', async (req, res) => {
   try {
     const { id } = req.params;
     let updatedBus;
+    
     if (mongoose.Types.ObjectId.isValid(id)) {
       updatedBus = await Bus.findByIdAndUpdate(id, { $set: req.body }, { new: true });
     } else {
       updatedBus = await Bus.findOneAndUpdate({ id: Number(id) }, { $set: req.body }, { new: true });
+    }
+
+    if (!updatedBus) {
+      return res.status(404).json({ message: 'Bus route not found' });
     }
     res.status(200).json(updatedBus);
   } catch (error) {
@@ -233,7 +268,15 @@ app.delete('/api/buses/:id', async (req, res) => {
 // Tickets Routes
 app.get('/api/tickets', async (req, res) => {
   try {
-    const tickets = await Ticket.find({});
+    const { email } = req.query;
+    let query = {};
+    if (email) {
+      query.$or = [
+        { userEmail: new RegExp(`^${email.trim()}$`, 'i') },
+        { passengerEmail: new RegExp(`^${email.trim()}$`, 'i') }
+      ];
+    }
+    const tickets = await Ticket.find(query).sort({ createdAt: -1 });
     res.status(200).json(tickets);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch tickets' });

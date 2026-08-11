@@ -19,8 +19,8 @@ import {
   Check,
   Lock,
   Camera,
-  Key,
-  Receipt
+  Receipt,
+  RefreshCw
 } from 'lucide-react';
 
 const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
@@ -59,6 +59,7 @@ const formatTimeWithAmPm = (timeStr) => {
 
 export default function User({ activeTab = 'Home', user = {} }) {
   const [buses, setBuses] = useState([]);
+  const [loadingBuses, setLoadingBuses] = useState(true);
   const [searchFrom, setSearchFrom] = useState('All Districts');
   const [searchTo, setSearchTo] = useState('All Districts');
   
@@ -78,8 +79,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
   const [currentUserData, setCurrentUserData] = useState({
     name: user?.name || 'Passenger User',
-    phone: user?.phone || '01700000000',
-    email: user?.emailOrPhone || user?.email || 'passenger@onlinebus.bd',
+    phone: user?.phone || '',
+    email: user?.emailOrPhone || user?.email || '',
     avatar: user?.avatar || '',
     role: 'Passenger'
   });
@@ -95,76 +96,73 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
   const [userPaymentHistory, setUserPaymentHistory] = useState([]);
 
-  const loadData = useCallback(async () => {
+  // Fetch Bus Routes directly from MongoDB API
+  const fetchBuses = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/buses`);
+      setLoadingBuses(true);
+      let queryParams = [];
+      if (searchFrom !== 'All Districts') queryParams.push(`from=${encodeURIComponent(searchFrom)}`);
+      if (searchTo !== 'All Districts') queryParams.push(`to=${encodeURIComponent(searchTo)}`);
+      
+      const queryString = queryParams.length ? `?${queryParams.join('&')}` : '';
+      const res = await fetch(`${API_BASE}/buses${queryString}`);
+      
       if (res.ok) {
         const liveBuses = await res.json();
         setBuses(Array.isArray(liveBuses) ? liveBuses : []);
-        localStorage.setItem('app_buses', JSON.stringify(liveBuses));
-      } else {
-        const savedBuses = localStorage.getItem('app_buses');
-        if (savedBuses) setBuses(JSON.parse(savedBuses));
       }
     } catch (err) {
-      console.warn('Backend unavailable, using cached bus data.');
-      const savedBuses = localStorage.getItem('app_buses');
-      if (savedBuses) setBuses(JSON.parse(savedBuses));
+      console.error('Error fetching buses:', err);
+    } finally {
+      setLoadingBuses(false);
     }
+  }, [searchFrom, searchTo]);
+
+  // Fetch User's Ticket History from MongoDB
+  const fetchUserTickets = useCallback(async () => {
+    const userEmail = currentUserData.email;
+    if (!userEmail) return;
 
     try {
-      const resTickets = await fetch(`${API_BASE}/tickets`);
-      if (resTickets.ok) {
-        const liveTickets = await resTickets.json();
-        localStorage.setItem('app_tickets', JSON.stringify(liveTickets));
+      const res = await fetch(`${API_BASE}/tickets?email=${encodeURIComponent(userEmail)}`);
+      if (res.ok) {
+        const tickets = await res.json();
+        setUserPaymentHistory(Array.isArray(tickets) ? tickets : []);
       }
     } catch (err) {
-      console.warn('Backend ticket fetch error.');
+      console.error('Error fetching ticket history:', err);
     }
+  }, [currentUserData.email]);
 
-    const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
-    const activeEmail = user?.emailOrPhone || user?.email || 'passenger@onlinebus.bd';
-    const activePhone = user?.phone || '01700000000';
+  useEffect(() => {
+    fetchBuses();
+  }, [fetchBuses]);
 
-    const foundUser = loadedUsers.find(
-      (u) => (u.email && u.email.toLowerCase() === activeEmail.toLowerCase()) || 
-             (u.phone && u.phone === activePhone)
-    );
+  useEffect(() => {
+    const activeEmail = user?.emailOrPhone || user?.email || '';
+    const activePhone = user?.phone || '';
 
-    const currentUser = {
-      name: foundUser?.name || user?.name || 'Passenger User',
-      phone: foundUser?.phone || activePhone,
-      email: foundUser?.email || activeEmail,
-      avatar: foundUser?.avatar || user?.avatar || '',
+    setCurrentUserData({
+      name: user?.name || 'Passenger User',
+      phone: activePhone,
+      email: activeEmail,
+      avatar: user?.avatar || '',
       role: 'Passenger'
-    };
+    });
 
-    setCurrentUserData(currentUser);
     setEditForm({
-      name: currentUser.name,
-      phone: currentUser.phone,
-      email: currentUser.email,
-      avatar: currentUser.avatar
+      name: user?.name || '',
+      phone: activePhone,
+      email: activeEmail,
+      avatar: user?.avatar || ''
     });
-
-    const allTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
-    const filteredUserTickets = allTickets.filter((ticket) => {
-      const matchEmail = ticket.userEmail && ticket.userEmail.toLowerCase() === currentUser.email.toLowerCase();
-      const matchPhone = ticket.passengerPhone && ticket.passengerPhone === currentUser.phone;
-      return matchEmail || matchPhone;
-    });
-
-    setUserPaymentHistory([...filteredUserTickets].reverse());
   }, [user]);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(() => {
-      loadData();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [loadData]);
+    if (currentUserData.email) {
+      fetchUserTickets();
+    }
+  }, [currentUserData.email, fetchUserTickets]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -181,27 +179,26 @@ export default function User({ activeTab = 'Home', user = {} }) {
     }
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
-    
-    const updatedUsers = loadedUsers.map((u) => {
-      if ((u.email && u.email.toLowerCase() === currentUserData.email.toLowerCase()) || u.phone === currentUserData.phone) {
-        return { 
-          ...u, 
-          name: editForm.name, 
-          phone: editForm.phone, 
-          email: editForm.email,
-          avatar: editForm.avatar 
-        };
-      }
-      return u;
-    });
+    try {
+      const res = await fetch(`${API_BASE}/users/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      });
 
-    localStorage.setItem('app_users', JSON.stringify(updatedUsers));
-    setCurrentUserData((prev) => ({ ...prev, ...editForm }));
-    setIsEditingProfile(false);
-    alert('Profile updated successfully!');
+      if (res.ok) {
+        const updated = await res.json();
+        setCurrentUserData((prev) => ({ ...prev, ...updated }));
+        setIsEditingProfile(false);
+        alert('Profile updated successfully!');
+      } else {
+        alert('Failed to update profile on server.');
+      }
+    } catch (err) {
+      alert('Network error while updating profile.');
+    }
   };
 
   const handleChangePassword = (e) => {
@@ -219,12 +216,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     setIsChangingPassword(false);
   };
-
-  const filteredBuses = buses.filter((bus) => {
-    const matchesFrom = searchFrom === 'All Districts' || bus.from?.toLowerCase() === searchFrom.toLowerCase();
-    const matchesTo = searchTo === 'All Districts' || bus.to?.toLowerCase() === searchTo.toLowerCase();
-    return matchesFrom && matchesTo;
-  });
 
   const getNumericFare = (fareString) => {
     if (typeof fareString === 'number') return fareString;
@@ -276,86 +267,69 @@ export default function User({ activeTab = 'Home', user = {} }) {
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
 
     try {
-      await fetch(`${API_BASE}/buses/${busId}`, {
+      // 1. Reserve seats in MongoDB Atlas
+      const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookedSeats: updatedBookedSeats })
       });
-    } catch (err) {
-      console.warn('Backend server sync pending.');
-    }
 
-    const updatedBuses = buses.map((bus) => {
-      if ((bus._id || bus.id) === busId) {
-        return {
-          ...bus,
-          bookedSeats: updatedBookedSeats
-        };
+      if (!resBus.ok) {
+        throw new Error('Failed to update reserved seats on server.');
       }
-      return bus;
-    });
 
-    const newTicketRecord = {
-      id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
-      busId: busId,
-      busName: selectedBus.name,
-      route: selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`,
-      seats: [...selectedSeats],
-      fare: totalAmount,
-      passengerName: passenger.name,
-      passengerPhone: passenger.phone,
-      userEmail: currentUserData.email,
-      paymentMethod: paymentMethod,
-      trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
-      purchaseDate: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    };
+      // 2. Save ticket in MongoDB Atlas
+      const newTicketRecord = {
+        id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
+        busId: busId,
+        busName: selectedBus.name,
+        route: selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`,
+        seats: [...selectedSeats],
+        fare: totalAmount,
+        passengerName: passenger.name,
+        passengerPhone: passenger.phone,
+        userEmail: currentUserData.email,
+        paymentMethod: paymentMethod,
+        trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
+        purchaseDate: new Date().toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      };
 
-    try {
       await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTicketRecord)
       });
+
+      // 3. Refresh Data
+      fetchBuses();
+      fetchUserTickets();
+
+      setBookingSuccess({
+        busName: selectedBus.name,
+        busNumber: selectedBus.busNumber,
+        seats: [...selectedSeats],
+        totalPaid: totalAmount,
+        trxId: newTicketRecord.trxId,
+        paymentMethod,
+        passengerName: passenger.name
+      });
+
+      setIsCheckoutOpen(false);
+      setSelectedSeats([]);
+      setSelectedBus((prev) => ({
+        ...prev,
+        bookedSeats: updatedBookedSeats
+      }));
+
     } catch (err) {
-      console.warn('Ticket backend sync error.');
+      alert('Transaction failed. Please check internet connection.');
     }
-
-    const savedTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
-    const updatedTickets = [...savedTickets, newTicketRecord];
-
-    localStorage.setItem('app_buses', JSON.stringify(updatedBuses));
-    localStorage.setItem('app_tickets', JSON.stringify(updatedTickets));
-
-    setBuses(updatedBuses);
-    
-    const userOnly = updatedTickets.filter(
-      (t) => (t.userEmail && t.userEmail.toLowerCase() === currentUserData.email.toLowerCase()) || t.passengerPhone === currentUserData.phone
-    );
-    setUserPaymentHistory([...userOnly].reverse());
-
-    setBookingSuccess({
-      busName: selectedBus.name,
-      busNumber: selectedBus.busNumber,
-      seats: [...selectedSeats],
-      totalPaid: totalAmount,
-      trxId: newTicketRecord.trxId,
-      paymentMethod,
-      passengerName: passenger.name
-    });
-
-    setIsCheckoutOpen(false);
-    setSelectedSeats([]);
-
-    setSelectedBus((prev) => ({
-      ...prev,
-      bookedSeats: updatedBookedSeats
-    }));
   };
 
   const currentTab = (activeTab || 'Home').toLowerCase();
@@ -409,22 +383,27 @@ export default function User({ activeTab = 'Home', user = {} }) {
           </div>
 
           <div style={styles.sectionHeader}>
-            <h3 style={styles.sectionTitle}>Available Bus Routes ({filteredBuses.length})</h3>
-            <span style={styles.liveSyncBadge}>● Live Real-Time Availability</span>
+            <h3 style={styles.sectionTitle}>Available Bus Routes ({buses.length})</h3>
+            <button style={styles.refreshBtn} onClick={fetchBuses}>
+              <RefreshCw size={12} className={loadingBuses ? 'spin' : ''} /> Refresh Routes
+            </button>
           </div>
 
-          {filteredBuses.length === 0 ? (
+          {loadingBuses ? (
+            <div style={styles.emptyCard}>
+              <RefreshCw size={36} color="#3b82f6" />
+              <p style={{ color: '#a1a1aa', marginTop: '12px' }}>Loading routes from cloud database...</p>
+            </div>
+          ) : buses.length === 0 ? (
             <div style={styles.emptyCard}>
               <Bus size={48} color="#71717a" />
               <p style={{ color: '#a1a1aa', margin: '8px 0 0 0' }}>
-                {buses.length === 0 
-                  ? "No routes available. Admin hasn't added any routes yet." 
-                  : "No bus routes available for the selected destination."}
+                No bus routes found for the selected route. Try selecting 'All Districts'.
               </p>
             </div>
           ) : (
             <div style={styles.routeGrid}>
-              {filteredBuses.map((bus) => {
+              {buses.map((bus) => {
                 const bookedCount = (bus.bookedSeats || []).length;
                 const availableCount = (bus.seats || 36) - bookedCount;
 
@@ -627,9 +606,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     <input 
                       type="email" 
                       value={editForm.email} 
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      style={styles.modalInput}
-                      required 
+                      disabled
+                      style={{ ...styles.modalInput, opacity: 0.7, cursor: 'not-allowed' }}
                     />
                   </div>
                 </div>
@@ -657,7 +635,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                   <Phone size={18} color="#a1a1aa" />
                   <div>
                     <span style={styles.infoLabel}>Phone Number</span>
-                    <p style={styles.infoValue}>{currentUserData.phone}</p>
+                    <p style={styles.infoValue}>{currentUserData.phone || 'N/A'}</p>
                   </div>
                 </div>
 
@@ -752,7 +730,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {userPaymentHistory.map((ticket, index) => (
-                  <div key={ticket.id || index} style={styles.historyTicketCard}>
+                  <div key={ticket._id || ticket.id || index} style={styles.historyTicketCard}>
                     <div style={styles.historyCardHeader}>
                       <span style={{ fontWeight: '700', color: '#f4f4f5' }}>{ticket.busName}</span>
                       <span style={styles.successTicketBadge}>Confirmed • ৳ {ticket.fare}</span>
@@ -774,7 +752,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                       </div>
                       <div>
                         <span style={styles.hLabel}>Transaction ID:</span>
-                        <span style={{ ...styles.hVal, fontFamily: 'monospace', color: '#22c55e' }}>{ticket.trxId || 'TRX893240'}</span>
+                        <span style={{ ...styles.hVal, fontFamily: 'monospace', color: '#22c55e' }}>{ticket.trxId || 'N/A'}</span>
                       </div>
                     </div>
                   </div>
@@ -1102,7 +1080,7 @@ const styles = {
 
   sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { margin: 0, fontSize: '1.2rem', fontWeight: '700' },
-  liveSyncBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' },
+  refreshBtn: { backgroundColor: '#27272a', color: '#38bdf8', border: '1px solid #3f3f46', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' },
 
   emptyCard: { backgroundColor: '#27272a', padding: '40px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
   routeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' },
