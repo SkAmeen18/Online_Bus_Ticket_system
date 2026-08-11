@@ -179,17 +179,28 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     }, 0);
   }, [ticketSales]);
 
-  // Passenger search filtering
+  // Filter out admin/staff accounts to isolate real passengers
+  const realPassengers = useMemo(() => {
+    return registeredUsers.filter((u) => {
+      const isRoleAdmin = u.role === 'admin' || u.isAdmin === true;
+      const isEmailAdmin = u.email && u.email.toLowerCase().includes('admin');
+      const isNameAdmin = u.name && u.name.toLowerCase().trim() === 'admin';
+
+      return !isRoleAdmin && !isEmailAdmin && !isNameAdmin;
+    });
+  }, [registeredUsers]);
+
+  // Passenger search filtering on real passengers only
   const filteredUsers = useMemo(() => {
-    if (!userSearchTerm.trim()) return registeredUsers;
+    if (!userSearchTerm.trim()) return realPassengers;
     const term = userSearchTerm.toLowerCase();
-    return registeredUsers.filter((u) =>
+    return realPassengers.filter((u) =>
       (u.name && u.name.toLowerCase().includes(term)) ||
       (u.email && u.email.toLowerCase().includes(term)) ||
       (u.emailOrPhone && u.emailOrPhone.toLowerCase().includes(term)) ||
       (u.phone && u.phone.includes(term))
     );
-  }, [registeredUsers, userSearchTerm]);
+  }, [realPassengers, userSearchTerm]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newBus, setNewBus] = useState(INITIAL_FORM_STATE);
@@ -335,15 +346,15 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     );
   };
 
-  // Export Registered Users to CSV
+  // Export Registered Real Passengers to CSV
   const handleExportUsersCSV = () => {
-    if (!registeredUsers.length) {
-      alert('No user data available to export.');
+    if (!realPassengers.length) {
+      alert('No passenger data available to export.');
       return;
     }
 
     const headers = ['User ID', 'Name', 'Email', 'Phone', 'Joined Date'];
-    const rows = registeredUsers.map((u, idx) => [
+    const rows = realPassengers.map((u, idx) => [
       `USR-${String(idx + 1).padStart(3, '0')}`,
       `"${u.name || 'N/A'}"`,
       `"${u.email || u.emailOrPhone || 'N/A'}"`,
@@ -440,7 +451,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
             <div style={styles.statCard}>
               <div style={styles.statIconWrapper}><Users size={22} color="#a1a1aa" /></div>
               <div>
-                <h3 style={styles.statValue}>{registeredUsers.length} Real Users</h3>
+                <h3 style={styles.statValue}>{realPassengers.length} Real Users</h3>
                 <span style={styles.statLabel}>Registered Accounts</span>
               </div>
             </div>
