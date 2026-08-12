@@ -234,24 +234,11 @@ export default function User({ activeTab = 'Home', user = {} }) {
     }
   };
 
-  const handleOpenBus = async (bus) => {
+  const handleOpenBus = (bus) => {
     setSelectedBus(bus);
     setSelectedSeats([]);
     setActiveImageIndex(0);
     setBookingSuccess(null);
-
-    // Refresh buses to ensure latest booked seats are fetched
-    try {
-      const res = await fetch(`${API_BASE}/buses`);
-      if (res.ok) {
-        const liveBuses = await res.json();
-        setBuses(liveBuses);
-        const currentBus = liveBuses.find(b => (b._id || b.id) === (bus._id || bus.id));
-        if (currentBus) setSelectedBus(currentBus);
-      }
-    } catch (e) {
-      console.error('Failed to sync latest bus seats');
-    }
   };
 
   const handleProceedToPayment = () => {
@@ -277,7 +264,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
     const busId = selectedBus._id || selectedBus.id;
     const existingBooked = selectedBus.bookedSeats || [];
-    const updatedBookedSeats = [...new Set([...existingBooked, ...selectedSeats])];
+    const updatedBookedSeats = [...existingBooked, ...selectedSeats];
 
     try {
       // 1. Reserve seats in MongoDB Atlas
@@ -291,24 +278,17 @@ export default function User({ activeTab = 'Home', user = {} }) {
         throw new Error('Failed to update reserved seats on server.');
       }
 
-      const updatedBusData = await resBus.json();
-
-      // 2. Save ticket transaction record in MongoDB Atlas
+      // 2. Save ticket in MongoDB Atlas
       const newTicketRecord = {
         id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
         busId: busId,
         busName: selectedBus.name,
-        from: selectedBus.from,
-        to: selectedBus.to,
         route: selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`,
         seats: [...selectedSeats],
         fare: totalAmount,
-        price: totalAmount,
         passengerName: passenger.name,
         passengerPhone: passenger.phone,
-        passengerEmail: passenger.email || currentUserData.email,
         userEmail: currentUserData.email,
-        userPhone: currentUserData.phone || passenger.phone,
         paymentMethod: paymentMethod,
         trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
         purchaseDate: new Date().toLocaleDateString('en-US', {
@@ -326,9 +306,9 @@ export default function User({ activeTab = 'Home', user = {} }) {
         body: JSON.stringify(newTicketRecord)
       });
 
-      // 3. Refresh live database states
-      await fetchBuses();
-      await fetchUserTickets();
+      // 3. Refresh Data
+      fetchBuses();
+      fetchUserTickets();
 
       setBookingSuccess({
         busName: selectedBus.name,
@@ -342,11 +322,13 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
       setIsCheckoutOpen(false);
       setSelectedSeats([]);
-      setSelectedBus(updatedBusData);
+      setSelectedBus((prev) => ({
+        ...prev,
+        bookedSeats: updatedBookedSeats
+      }));
 
     } catch (err) {
-      console.error(err);
-      alert('Transaction failed. Please check your network connection.');
+      alert('Transaction failed. Please check internet connection.');
     }
   };
 
@@ -751,7 +733,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                   <div key={ticket._id || ticket.id || index} style={styles.historyTicketCard}>
                     <div style={styles.historyCardHeader}>
                       <span style={{ fontWeight: '700', color: '#f4f4f5' }}>{ticket.busName}</span>
-                      <span style={styles.successTicketBadge}>Confirmed • ৳ {ticket.fare || ticket.price}</span>
+                      <span style={styles.successTicketBadge}>Confirmed • ৳ {ticket.fare}</span>
                     </div>
                     <div style={styles.historyCardGrid}>
                       <div>

@@ -86,9 +86,17 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     };
   });
 
-  const [buses, setBuses] = useState([]);
+  // Zero default routes: Starts empty if nothing is cached
+  const [buses, setBuses] = useState(() => {
+    const savedBuses = localStorage.getItem('app_buses');
+    return savedBuses ? JSON.parse(savedBuses) : [];
+  });
+
   const [registeredUsers, setRegisteredUsers] = useState([]);
-  const [ticketSales, setTicketSales] = useState([]);
+  const [ticketSales, setTicketSales] = useState(() => {
+    const savedTickets = localStorage.getItem('app_tickets');
+    return savedTickets ? JSON.parse(savedTickets) : [];
+  });
 
   const [selectedUserHistory, setSelectedUserHistory] = useState(null);
   const [selectedBusDetails, setSelectedBusDetails] = useState(null);
@@ -114,7 +122,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   // Fetch buses, registered users, and tickets live from backend database
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Fetch Buses from MongoDB Atlas
+      // 1. Fetch Buses
       try {
         const res = await fetch(`${API_BASE}/buses`);
         if (res.ok) {
@@ -124,8 +132,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         }
       } catch (err) {
         console.warn('Backend unavailable, using cached bus data.');
-        const loadedBuses = JSON.parse(localStorage.getItem('app_buses') || '[]');
-        setBuses(loadedBuses);
       }
 
       // 2. Fetch Live Registered Users from MongoDB
@@ -142,7 +148,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         setRegisteredUsers(loadedUsers);
       }
 
-      // 3. Fetch Tickets from MongoDB Atlas
+      // 3. Fetch Tickets
       try {
         const res = await fetch(`${API_BASE}/tickets`);
         if (res.ok) {
@@ -160,23 +166,16 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     fetchData();
   }, [activeTab]);
 
-  // Total booked seat tickets count across all transactions
-  const totalTicketsSold = useMemo(() => {
-    return ticketSales.reduce((acc, item) => {
-      if (Array.isArray(item.seats) && item.seats.length > 0) {
-        return acc + item.seats.length;
-      }
-      return acc + 1;
-    }, 0);
-  }, [ticketSales]);
+  useEffect(() => {
+    localStorage.setItem('app_buses', JSON.stringify(buses));
+  }, [buses]);
 
-  // Total revenue calculated dynamically according to ticket price
+  const totalTicketsSold = ticketSales.length;
   const totalRevenue = useMemo(() => {
     return ticketSales.reduce((acc, item) => {
-      const fareVal = item.fare !== undefined ? item.fare : item.price;
-      const price = typeof fareVal === 'number'
-        ? fareVal
-        : parseInt(String(fareVal || '0').replace(/[^0-9]/g, ''), 10) || 0;
+      const price = typeof item.fare === 'number'
+        ? item.fare
+        : parseInt(String(item.fare || '0').replace(/[^0-9]/g, ''), 10) || 0;
       return acc + price;
     }, 0);
   }, [ticketSales]);
@@ -327,11 +326,9 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     setBuses((prev) => prev.filter((bus) => bus.id !== id && bus._id !== id));
   };
 
-  // Toggle seat manually from Admin & sync change directly to MongoDB Atlas
-  const handleToggleSeatAdmin = async (seatId) => {
+  const handleToggleSeatAdmin = (seatId) => {
     if (!selectedBusDetails) return;
 
-    const busId = selectedBusDetails._id || selectedBusDetails.id;
     const currentBooked = selectedBusDetails.bookedSeats || [];
     const isBooked = currentBooked.includes(seatId);
 
@@ -344,19 +341,9 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     setSelectedBusDetails(updatedBus);
     setBuses((prevBuses) =>
       prevBuses.map((b) =>
-        (b._id || b.id) === busId ? updatedBus : b
+        (b._id || b.id) === (selectedBusDetails._id || selectedBusDetails.id) ? updatedBus : b
       )
     );
-
-    try {
-      await fetch(`${API_BASE}/buses/${busId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookedSeats: updatedBooked })
-      });
-    } catch (err) {
-      console.error('Failed to update seat in MongoDB:', err);
-    }
   };
 
   const handleExportUsersCSV = () => {
@@ -418,7 +405,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       if (res.ok) {
         const savedBus = await res.json();
         setBuses((prev) => [...prev, savedBus]);
-        alert('Route saved successfully to MongoDB Atlas database!');
+        alert('Route saved successfully to cloud database!');
       } else {
         setBuses((prev) => [...prev, createdBus]);
         alert('Saved locally. Backend cloud server returned an error.');
@@ -1073,7 +1060,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                   </div>
 
                   <div style={styles.verticalSeatContainer}>
-                    {Array.from({ length: Math.ceil((selectedBusDetails.seats || 36) / 4) }).map((_, rowIndex) => {
+                    {Array.from({ length: Math.ceil(selectedBusDetails.seats / 4) }).map((_, rowIndex) => {
                       const rowLetter = String.fromCharCode(65 + rowIndex);
                       const s1 = `${rowLetter}1`;
                       const s2 = `${rowLetter}2`;
@@ -1142,10 +1129,10 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                             <img
                               key={i}
                               src={img}
-                              alt="thumb"
+                              alt={`Bus preview ${i}`}
                               style={{
                                 ...styles.thumbImg,
-                                border: activeImageIndex === i ? '2px solid #38bdf8' : '1px solid #3f3f46'
+                                border: activeImageIndex === i ? '2px solid #a1a1aa' : '1px solid #3f3f46'
                               }}
                               onClick={() => setActiveImageIndex(i)}
                             />
@@ -1155,77 +1142,200 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                     </div>
                   ) : (
                     <div style={styles.largeImgPlaceholder}>
-                      <Bus size={44} color="#52525b" />
-                      <span>No Pictures Available</span>
+                      <Bus size={60} color="#52525b" />
+                      <span>No Pictures Uploaded</span>
                     </div>
                   )}
                 </div>
 
-                <div style={styles.bookingSummaryBox}>
-                  <h4 style={{ margin: '0 0 10px 0', color: '#f4f4f5', fontSize: '0.95rem' }}>Route Particulars</h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#a1a1aa' }}>Route:</span>
-                    <strong style={{ color: '#f4f4f5' }}>{selectedBusDetails.route || `${selectedBusDetails.from} to ${selectedBusDetails.to}`}</strong>
+                <div style={styles.detailGridStacked}>
+                  <div style={styles.detailCard}>
+                    <span style={styles.detailLabel}>Route</span>
+                    <span style={styles.detailValue}>
+                      {selectedBusDetails.route || `${selectedBusDetails.from} to ${selectedBusDetails.to}`}
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#a1a1aa' }}>Fare Per Seat:</span>
-                    <strong style={{ color: '#22c55e' }}>{selectedBusDetails.fare}</strong>
+
+                  <div style={styles.detailCard}>
+                    <span style={styles.detailLabel}>Bus Type</span>
+                    <span style={{ ...styles.detailValue, color: '#38bdf8' }}>
+                      {selectedBusDetails.busType || 'Standard Class'}
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#a1a1aa' }}>Booked Seats Count:</span>
-                    <strong style={{ color: '#38bdf8' }}>{(selectedBusDetails.bookedSeats || []).length} / {selectedBusDetails.seats}</strong>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ ...styles.detailCard, flex: 1 }}>
+                      <span style={styles.detailLabel}>Ticket Fare</span>
+                      <span style={{ ...styles.detailValue, color: '#22c55e', fontSize: '1.1rem' }}>
+                        {selectedBusDetails.fare}
+                      </span>
+                    </div>
+
+                    <div style={{ ...styles.detailCard, flex: 1 }}>
+                      <span style={styles.detailLabel}>Departure / Arrival</span>
+                      <span style={styles.detailValue}>
+                        {selectedBusDetails.departureTime || 'N/A'} - {selectedBusDetails.arrivalTime || 'N/A'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* USER ACTIVITY / HISTORY MODAL */}
-      {selectedUserHistory && (
-        <div style={styles.modalOverlay} onClick={() => setSelectedUserHistory(null)}>
-          <div style={{ ...styles.modalContent, maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div>
-                <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.2rem' }}>
-                  Activity Log: {selectedUserHistory.name || 'Passenger'}
-                </h3>
-                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
-                  User ID: #{selectedUserHistory.serialId} | Email: {selectedUserHistory.email || selectedUserHistory.emailOrPhone}
-                </span>
               </div>
-              <button style={styles.closeBtn} onClick={() => setSelectedUserHistory(null)}>
-                <X size={20} />
+
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button style={styles.cancelBtn} onClick={() => setSelectedBusDetails(null)}>
+                Close Details
               </button>
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
-              {getUserPaymentsAndTickets(selectedUserHistory.email || selectedUserHistory.emailOrPhone, selectedUserHistory.phone).length === 0 ? (
-                <div style={styles.emptyBox}>
-                  <Receipt size={32} color="#71717a" />
-                  <p style={{ margin: 0 }}>No ticket booking transactions found for this passenger.</p>
-                </div>
-              ) : (
-                getUserPaymentsAndTickets(selectedUserHistory.email || selectedUserHistory.emailOrPhone, selectedUserHistory.phone).map((ticket, idx) => (
-                  <div key={ticket._id || ticket.id || idx} style={{ backgroundColor: '#18181b', padding: '14px', borderRadius: '10px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ color: '#f4f4f5', fontSize: '0.9rem' }}>{ticket.busName}</strong>
-                      <span style={{ color: '#22c55e', fontWeight: '700', fontSize: '0.85rem' }}>৳ {ticket.fare || ticket.price}</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.78rem', color: '#a1a1aa' }}>
-                      <div>Route: <strong style={{ color: '#d4d4d8' }}>{ticket.route}</strong></div>
-                      <div>Seats: <strong style={{ color: '#38bdf8' }}>{Array.isArray(ticket.seats) ? ticket.seats.join(', ') : ticket.seatNumber}</strong></div>
-                      <div>Payment: <strong style={{ color: '#d4d4d8' }}>{ticket.paymentMethod}</strong></div>
-                      <div>TRX ID: <strong style={{ color: '#22c55e', fontFamily: 'monospace' }}>{ticket.trxId || 'N/A'}</strong></div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         </div>
       )}
+
+      {/* COMPLETE USER PROFILE & PAYMENT HISTORY MODAL */}
+      {selectedUserHistory && (() => {
+        const userEmail = selectedUserHistory.email || selectedUserHistory.emailOrPhone || 'N/A';
+        const userPhone = selectedUserHistory.phone || 'N/A';
+        const userPayments = getUserPaymentsAndTickets(userEmail, userPhone);
+
+        return (
+          <div style={styles.modalOverlay} onClick={() => setSelectedUserHistory(null)}>
+            <div style={{ ...styles.modalContent, maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.3rem' }}>
+                    User Activity & Payment Log
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
+                    Serial ID: #{selectedUserHistory.serialId} | Database Sync Active
+                  </span>
+                </div>
+                <button style={styles.closeBtn} onClick={() => setSelectedUserHistory(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* SECTION A: USER PROFILE INFO */}
+              <div style={styles.activityProfileSection}>
+                <div style={styles.activityProfileHeader}>
+                  <UserIcon size={18} color="#a1a1aa" />
+                  <span style={{ fontWeight: '700', color: '#f4f4f5', fontSize: '0.95rem' }}>
+                    Passenger Profile Details
+                  </span>
+                </div>
+
+                <div style={styles.activityProfileGrid}>
+                  <div style={styles.activityProfileCard}>
+                    <span style={styles.actLabel}><UserIcon size={12} /> Full Name</span>
+                    <span style={styles.actVal}>{selectedUserHistory.name || 'N/A'}</span>
+                  </div>
+
+                  <div style={styles.activityProfileCard}>
+                    <span style={styles.actLabel}><Mail size={12} /> Email Address</span>
+                    <span style={styles.actVal}>{userEmail}</span>
+                  </div>
+
+                  <div style={styles.activityProfileCard}>
+                    <span style={styles.actLabel}><Phone size={12} /> Mobile Phone</span>
+                    <span style={styles.actVal}>{userPhone}</span>
+                  </div>
+
+                  <div style={styles.activityProfileCard}>
+                    <span style={styles.actLabel}><Calendar size={12} /> Account Created</span>
+                    <span style={styles.actVal}>{selectedUserHistory.joined ? String(selectedUserHistory.joined).split('T')[0] : 'Standard Registration'}</span>
+                  </div>
+
+                  <div style={styles.activityProfileCard}>
+                    <span style={styles.actLabel}><MapPin size={12} /> Registered Address</span>
+                    <span style={styles.actVal}>{selectedUserHistory.address || 'Dhaka, Bangladesh'}</span>
+                  </div>
+
+                  <div style={styles.activityProfileCard}>
+                    <span style={styles.actLabel}><ShieldCheck size={12} /> Account Status</span>
+                    <span style={{ ...styles.actVal, color: '#22c55e', fontWeight: '700' }}>Active Passenger</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION B: PAYMENT & TRANSACTION LOGS */}
+              <div style={{ marginTop: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f4f4f5', fontWeight: '700', fontSize: '0.95rem' }}>
+                    <Receipt size={18} color="#a1a1aa" />
+                    Payment & Booking History ({userPayments.length})
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>
+                    Auto-matched from live tickets database
+                  </span>
+                </div>
+
+                {userPayments.length === 0 ? (
+                  <div style={styles.emptyBoxCompact}>
+                    <CreditCard size={30} color="#52525b" />
+                    <p style={{ margin: 0, fontSize: '0.85rem' }}>No ticket purchases or payments recorded for this user yet.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {userPayments.map((payment, idx) => (
+                      <div key={payment.id || payment._id || idx} style={styles.paymentCard}>
+                        <div style={styles.paymentCardHeader}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <CheckCircle2 size={16} color="#22c55e" />
+                            <span style={{ fontWeight: '700', color: '#f4f4f5', fontSize: '0.9rem' }}>
+                              {payment.busName || payment.operator || 'Express Bus Service'}
+                            </span>
+                          </div>
+                          <span style={styles.paymentBadgeSuccess}>
+                            Paid • ৳ {payment.fare || payment.price || '0'}
+                          </span>
+                        </div>
+
+                        <div style={styles.paymentDetailsGrid}>
+                          <div>
+                            <span style={styles.paySubLabel}>Route:</span>
+                            <span style={styles.paySubValue}>{payment.from || 'Origin'} ➔ {payment.to || 'Destination'}</span>
+                          </div>
+
+                          <div>
+                            <span style={styles.paySubLabel}>Seats:</span>
+                            <span style={{ ...styles.paySubValue, color: '#f4f4f5', fontWeight: '700' }}>
+                              {Array.isArray(payment.seats) ? payment.seats.join(', ') : (payment.seats || 'N/A')}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span style={styles.paySubLabel}>Payment Method:</span>
+                            <span style={styles.paySubValue}>{payment.paymentMethod || payment.gateway || 'bKash / Card'}</span>
+                          </div>
+
+                          <div>
+                            <span style={styles.paySubLabel}>Transaction ID:</span>
+                            <span style={{ ...styles.paySubValue, fontFamily: 'monospace', color: '#38bdf8' }}>
+                              {payment.trxId || payment.transactionId || `TRX-${100000 + idx * 832}`}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span style={styles.paySubLabel}>Date & Time:</span>
+                            <span style={styles.paySubValue}>{payment.date || payment.bookingDate || 'Recent'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button style={styles.cancelBtn} onClick={() => setSelectedUserHistory(null)}>
+                  Close Activity Log
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ADD BUS ROUTE MODAL */}
       {isModalOpen && (
@@ -1233,30 +1343,69 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
           <div style={{ ...styles.modalContent, maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={styles.modalHeader}>
               <div>
-                <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.3rem' }}>Add Bus Route</h3>
-                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Create a new inter-city bus schedule</span>
+                <h3 style={{ margin: 0, color: '#f4f4f5' }}>Add New Bus Route</h3>
+                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Select seat capacity and timing options</span>
               </div>
               <button style={styles.closeBtn} onClick={handleCloseModal}><X size={20} /></button>
             </div>
 
             <form onSubmit={handleAddBusSubmit} style={styles.modalForm}>
+              <div style={styles.fieldGroup}>
+                <label style={styles.modalLabel}>
+                  <ImageIcon size={14} color="#a1a1aa" /> Upload Bus Pictures
+                </label>
+                <div style={styles.uploadBox}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleBusImagesUpload}
+                    id="bus-images-input"
+                    style={{ display: 'none' }}
+                  />
+                  <label htmlFor="bus-images-input" style={styles.uploadLabelBtn}>
+                    <PlusCircle size={16} /> Choose Bus Photos
+                  </label>
+
+                  {newBus.images.length > 0 && (
+                    <div style={styles.imagePreviewRow}>
+                      {newBus.images.map((img, idx) => (
+                        <div key={idx} style={styles.imgBadgeWrapper}>
+                          <img src={img} alt={`Bus preview ${idx}`} style={styles.previewThumb} />
+                          <button
+                            type="button"
+                            style={styles.removeImgBtn}
+                            onClick={() => handleRemoveImage(idx)}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div style={styles.formRow}>
-                <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}>Bus Operator Name</label>
+                <div style={{ ...styles.fieldGroup, flex: 1.5 }}>
+                  <label style={styles.modalLabel}>Operator / Bus Name</label>
                   <input
                     type="text"
-                    placeholder="e.g. Green Line Paribahan"
+                    placeholder="e.g. Shyamoli NR Travels"
                     value={newBus.name}
                     onChange={(e) => setNewBus({ ...newBus, name: e.target.value })}
                     style={styles.modalInput}
                     required
                   />
                 </div>
+
                 <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}>Coach / Bus Number</label>
+                  <label style={styles.modalLabel}>
+                    <Hash size={13} color="#a1a1aa" /> Coach / Bus No
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. DHAKA-METRO-BA-14-8890"
+                    placeholder="e.g. DHAKA-METRO-11"
                     value={newBus.busNumber}
                     onChange={(e) => setNewBus({ ...newBus, busNumber: e.target.value })}
                     style={styles.modalInput}
@@ -1266,63 +1415,31 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
               </div>
 
               <div style={styles.formRow}>
-                <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}>From District</label>
-                  <select
-                    value={newBus.from}
-                    onChange={(e) => setNewBus({ ...newBus, from: e.target.value })}
-                    style={styles.modalSelect}
-                    required
-                  >
-                    <option value="">Select Origin District</option>
-                    {BANGLADESH_DISTRICTS.map((d) => (
-                      <option key={`from-${d}`} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}>To District</label>
-                  <select
-                    value={newBus.to}
-                    onChange={(e) => setNewBus({ ...newBus, to: e.target.value })}
-                    style={styles.modalSelect}
-                    required
-                  >
-                    <option value="">Select Destination District</option>
-                    {BANGLADESH_DISTRICTS.map((d) => (
-                      <option key={`to-${d}`} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={styles.formRow}>
-                <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}>Bus Type / Category</label>
+                <div style={{ ...styles.fieldGroup, flex: 1.5 }}>
+                  <label style={styles.modalLabel}>Bus Type Category</label>
                   <select
                     value={newBus.busType}
                     onChange={(e) => setNewBus({ ...newBus, busType: e.target.value })}
                     style={styles.modalSelect}
                     required
                   >
-                    <option value="">Select Bus Type</option>
-                    {BUS_TYPES.map((bt) => (
-                      <option key={bt} value={bt}>{bt}</option>
+                    <option value="" disabled>-- Select Bus Type --</option>
+                    {BUS_TYPES.map((type, idx) => (
+                      <option key={idx} value={type}>{type}</option>
                     ))}
                   </select>
                 </div>
 
                 <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}>Total Capacity Seats</label>
+                  <label style={styles.modalLabel}>Seat Capacity Option</label>
                   <select
                     value={newBus.seats}
                     onChange={(e) => setNewBus({ ...newBus, seats: e.target.value })}
                     style={styles.modalSelect}
                     required
                   >
-                    {SEAT_OPTIONS.map((s) => (
-                      <option key={s} value={s}>{s} Seats</option>
+                    {SEAT_OPTIONS.map((seatNum) => (
+                      <option key={seatNum} value={seatNum}>{seatNum} Seats</option>
                     ))}
                   </select>
                 </div>
@@ -1330,10 +1447,42 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
               <div style={styles.formRow}>
                 <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}>Ticket Price per Seat (BDT)</label>
+                  <label style={styles.modalLabel}>Departure District</label>
+                  <select
+                    value={newBus.from}
+                    onChange={(e) => setNewBus({ ...newBus, from: e.target.value })}
+                    style={styles.modalSelect}
+                    required
+                  >
+                    <option value="" disabled>-- Select District --</option>
+                    {BANGLADESH_DISTRICTS.map((dist) => (
+                      <option key={`from-${dist}`} value={dist}>{dist}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ ...styles.fieldGroup, flex: 1 }}>
+                  <label style={styles.modalLabel}>Arrival District</label>
+                  <select
+                    value={newBus.to}
+                    onChange={(e) => setNewBus({ ...newBus, to: e.target.value })}
+                    style={styles.modalSelect}
+                    required
+                  >
+                    <option value="" disabled>-- Select District --</option>
+                    {BANGLADESH_DISTRICTS.map((dist) => (
+                      <option key={`to-${dist}`} value={dist}>{dist}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={styles.formRow}>
+                <div style={{ ...styles.fieldGroup, flex: 1 }}>
+                  <label style={styles.modalLabel}>Ticket Fare (BDT)</label>
                   <input
                     type="text"
-                    placeholder="e.g. 850 BDT"
+                    placeholder="e.g. 1100"
                     value={newBus.fare}
                     onChange={(e) => setNewBus({ ...newBus, fare: e.target.value })}
                     style={styles.modalInput}
@@ -1342,122 +1491,320 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                 </div>
 
                 <div style={{ ...styles.fieldGroup, flex: 1 }}>
-                  <label style={styles.modalLabel}>Departure Time</label>
+                  <label style={styles.modalLabel}><Clock size={12} /> Departure Time</label>
                   <input
                     type="time"
                     value={newBus.departureTime}
                     onChange={(e) => setNewBus({ ...newBus, departureTime: e.target.value })}
                     style={styles.modalInput}
+                    required
+                  />
+                </div>
+
+                <div style={{ ...styles.fieldGroup, flex: 1 }}>
+                  <label style={styles.modalLabel}><Clock size={12} /> Arrival Time</label>
+                  <input
+                    type="time"
+                    value={newBus.arrivalTime}
+                    onChange={(e) => setNewBus({ ...newBus, arrivalTime: e.target.value })}
+                    style={styles.modalInput}
+                    required
                   />
                 </div>
               </div>
 
-              <div style={styles.fieldGroup}>
-                <label style={styles.modalLabel}>Upload Bus Images</label>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleBusImagesUpload}
-                  style={{ color: '#a1a1aa', fontSize: '0.85rem' }}
-                />
-
-                {newBus.images.length > 0 && (
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
-                    {newBus.images.map((img, i) => (
-                      <div key={i} style={{ position: 'relative', width: '60px', height: '45px' }}>
-                        <img src={img} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImage(i)}
-                          style={{ position: 'absolute', top: '-6px', right: '-6px', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px' }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               <div style={styles.modalActions}>
                 <button type="button" style={styles.cancelBtn} onClick={handleCloseModal}>Cancel</button>
-                <button type="submit" style={styles.submitModalBtn}>Create Route</button>
+                <button type="submit" style={styles.submitModalBtn}>Save Route</button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
 const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '24px', color: '#ffffff' },
-  headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
-  title: { margin: 0, fontSize: '1.5rem', fontWeight: '800' },
-  subText: { color: '#a1a1aa', margin: '4px 0 0 0', fontSize: '0.85rem' },
-  addBtn: { display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#3b82f6', color: '#ffffff', border: 'none', padding: '10px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer' },
-
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' },
-  statCard: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '14px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' },
-  statIconWrapper: { width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#18181b', border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  statValue: { margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#f4f4f5' },
-  statLabel: { fontSize: '0.78rem', color: '#a1a1aa' },
-
-  card: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px' },
+  headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  title: { margin: 0, fontSize: '1.5rem', fontWeight: '700' },
+  subText: { color: '#a1a1aa', margin: '4px 0 0 0', fontSize: '0.9rem' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' },
+  statCard: { backgroundColor: '#27272a', padding: '20px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', gap: '16px' },
+  statIconWrapper: { backgroundColor: '#3f3f46', padding: '12px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  statValue: { margin: 0, fontSize: '1.15rem', fontWeight: '700', color: '#f4f4f5' },
+  statLabel: { fontSize: '0.8rem', color: '#a1a1aa' },
+  card: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46' },
+  cardTitle: { margin: 0, fontSize: '1.2rem', fontWeight: '700' },
+  flexTitle: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' },
   tableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  cardTitle: { margin: 0, fontSize: '1.15rem', fontWeight: '700', color: '#f4f4f5' },
-  countBadge: { backgroundColor: '#18181b', border: '1px solid #3f3f46', color: '#a1a1aa', fontSize: '0.75rem', fontWeight: '700', padding: '4px 10px', borderRadius: '20px' },
-
-  emptyBox: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px', padding: '36px', textAlign: 'center', color: '#a1a1aa', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' },
-
-  routeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '18px' },
-  routeBox: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', flexDirection: 'column' },
-  boxImageArea: { height: '140px', backgroundColor: '#09090b', position: 'relative' },
-  boxImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  boxImgPlaceholder: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#71717a', gap: '6px', fontSize: '0.78rem' },
-  boxIdTag: { position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.75)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700' },
-  boxDeleteBtn: { position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(239, 68, 68, 0.85)', color: '#ffffff', border: 'none', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-  boxBody: { padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, justifyContent: 'space-between' },
-  operatorName: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '700', textTransform: 'uppercase' },
-  boxRouteTitle: { fontSize: '1rem', fontWeight: '700', color: '#f4f4f5' },
-  seatSummaryRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#27272a', padding: '6px 10px', borderRadius: '6px', fontSize: '0.75rem' },
-  seatSummaryText: { color: '#a1a1aa' },
-  bookedCountBadge: { color: '#38bdf8', fontWeight: '700' },
-  boxFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid #27272a', paddingTop: '8px' },
-  fareLabel: { fontSize: '0.68rem', color: '#71717a', display: 'block' },
-  boxFare: { fontSize: '1.05rem', fontWeight: '800', color: '#22c55e' },
-  viewDetailsHint: { fontSize: '0.75rem', color: '#38bdf8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' },
-
-  avatarContainer: { position: 'relative' },
-  avatarCircle: { width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#18181b', border: '2px solid #52525b', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  cameraBtn: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#3b82f6', padding: '6px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  roleBadge: { backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700' },
+  countBadge: { backgroundColor: '#3f3f46', color: '#a1a1aa', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '20px', fontWeight: '600' },
+  addBtn: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#3f3f46', color: '#ffffff', border: '1px solid #52525b', padding: '10px 18px', borderRadius: '10px', fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer' },
 
   searchWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
   searchIcon: { position: 'absolute', left: '10px' },
-  searchInput: { padding: '6px 12px 6px 30px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', fontSize: '0.8rem' },
+  searchInput: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '8px', padding: '6px 12px 6px 30px', color: '#ffffff', fontSize: '0.8rem', outline: 'none', width: '160px' },
 
-  table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' },
-  th: { padding: '12px 16px', color: '#a1a1aa', borderBottom: '1px solid #3f3f46', fontWeight: '600' },
-  tr: { borderBottom: '1px solid #27272a' },
-  td: { padding: '12px 16px', color: '#d4d4d8' },
-  userIdBadge: { fontFamily: 'monospace', color: '#38bdf8', fontWeight: '700' },
-  activeBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700' },
-  historyBtn: { backgroundColor: '#18181b', border: '1px solid #3f3f46', color: '#f4f4f5', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' },
+  routeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
+  routeBox: {
+    backgroundColor: '#18181b',
+    borderRadius: '14px',
+    border: '1px solid #3f3f46',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease, border-color 0.2s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+  },
+  boxImageArea: { position: 'relative', height: '140px', backgroundColor: '#27272a' },
+  boxImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  boxImgPlaceholder: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#71717a', gap: '6px', fontSize: '0.8rem' },
+  boxIdTag: { position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(24, 24, 27, 0.85)', color: '#d4d4d8', padding: '4px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '0.75rem', backdropFilter: 'blur(4px)' },
+  boxDeleteBtn: { position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(239, 68, 68, 0.9)', color: '#ffffff', border: 'none', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
+  boxBody: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-between' },
+  operatorName: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  boxRouteTitle: { fontSize: '1.05rem', fontWeight: '700', color: '#f4f4f5', margin: '2px 0' },
+  seatSummaryRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#a1a1aa' },
+  seatSummaryText: { color: '#a1a1aa' },
+  bookedCountBadge: { backgroundColor: '#3f3f46', color: '#38bdf8', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' },
+  boxFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '10px', borderTop: '1px solid #27272a' },
+  fareLabel: { fontSize: '0.7rem', color: '#71717a', display: 'block' },
+  boxFare: { fontSize: '1.1rem', fontWeight: '800', color: '#22c55e' },
+  viewDetailsHint: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' },
 
-  flexTitle: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' },
+  modalContentLarge: {
+    backgroundColor: '#27272a',
+    border: '1px solid #3f3f46',
+    borderRadius: '16px',
+    padding: '24px',
+    width: '90%',
+    maxWidth: '920px',
+    maxHeight: '90vh',
+    overflowY: 'auto'
+  },
+  modalTwoColumn: {
+    display: 'grid',
+    gridTemplateColumns: '320px 1fr',
+    gap: '24px',
+    marginTop: '10px'
+  },
+  leftSeatColumn: {
+    backgroundColor: '#18181b',
+    padding: '16px',
+    borderRadius: '12px',
+    border: '1px solid #3f3f46',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  seatHeaderFlex: {
+    display: 'flex',
+    justify: 'space-between',
+    alignItems: 'center',
+    marginBottom: '4px'
+  },
+  adminNoteText: {
+    fontSize: '0.68rem',
+    color: '#38bdf8',
+    fontStyle: 'italic',
+    marginBottom: '12px'
+  },
+  legendRow: {
+    display: 'flex',
+    gap: '8px',
+    fontSize: '0.7rem',
+    color: '#a1a1aa'
+  },
+  legendItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px'
+  },
+  legendBox: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '2px'
+  },
+  busChassis: {
+    border: '2px solid #3f3f46',
+    borderRadius: '20px 20px 10px 10px',
+    padding: '16px 14px',
+    backgroundColor: '#09090b',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '100%',
+    boxSizing: 'border-box'
+  },
+  driverCabinRow: {
+    width: '100%',
+    display: 'flex',
+    justify: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px dashed #3f3f46',
+    paddingBottom: '8px',
+    marginBottom: '12px'
+  },
+  driverIconBadge: {
+    fontSize: '0.75rem',
+    color: '#a1a1aa',
+    fontWeight: '600'
+  },
+  steeringWheel: {
+    fontSize: '0.9rem'
+  },
+  verticalSeatContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    maxHeight: '340px',
+    overflowY: 'auto',
+    paddingRight: '4px',
+    width: '100%'
+  },
+  busRowGroup: {
+    display: 'flex',
+    justify: 'space-between',
+    alignItems: 'center',
+    width: '100%'
+  },
+  seatPair: {
+    display: 'flex',
+    gap: '6px'
+  },
+  compactSeat: {
+    width: '40px',
+    height: '38px',
+    borderRadius: '8px',
+    display: 'flex',
+    justify: 'center',
+    alignItems: 'center',
+    textAlign: 'center',
+    padding: 0,
+    margin: 0,
+    border: 'none',
+    lineHeight: 'normal',
+    color: '#ffffff',
+    fontSize: '0.8rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)',
+    userSelect: 'none',
+    transition: 'opacity 0.15s ease'
+  },
+  aisleGap: {
+    flex: 1,
+    minWidth: '24px'
+  },
+  rightInfoColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px'
+  },
+  imageGalleryContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: '12px',
+    padding: '12px',
+    border: '1px solid #3f3f46'
+  },
+  mainLargeImg: {
+    width: '100%',
+    height: '210px',
+    objectFit: 'cover',
+    borderRadius: '8px',
+    border: '1px solid #3f3f46'
+  },
+  largeImgPlaceholder: {
+    width: '100%',
+    height: '210px',
+    borderRadius: '8px',
+    backgroundColor: '#27272a',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justify: 'center',
+    color: '#71717a',
+    gap: '8px',
+    fontSize: '0.85rem'
+  },
+  thumbnailRow: {
+    display: 'flex',
+    gap: '8px',
+    marginTop: '10px',
+    overflowX: 'auto',
+    paddingBottom: '2px'
+  },
+  thumbImg: {
+    width: '60px',
+    height: '45px',
+    borderRadius: '6px',
+    objectFit: 'cover',
+    border: '1px solid #3f3f46',
+    cursor: 'pointer'
+  },
+  detailGridStacked: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px'
+  },
+  detailCard: {
+    backgroundColor: '#18181b',
+    padding: '12px',
+    borderRadius: '8px',
+    border: '1px solid #3f3f46',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px'
+  },
+  detailLabel: {
+    fontSize: '0.75rem',
+    color: '#a1a1aa',
+    fontWeight: '600'
+  },
+  detailValue: {
+    fontSize: '0.95rem',
+    color: '#f4f4f5',
+    fontWeight: '700'
+  },
+
+  table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left' },
+  th: { padding: '14px 16px', borderBottom: '1px solid #3f3f46', color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  tr: { borderBottom: '1px solid #3f3f46' },
+  td: { padding: '14px 16px', fontSize: '0.85rem', color: '#d4d4d8' },
+  userIdBadge: { backgroundColor: '#18181b', color: '#d4d4d8', border: '1px solid #3f3f46', padding: '3px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '0.75rem' },
+  avatarContainer: { position: 'relative' },
+  avatarCircle: { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#18181b', border: '2px solid #52525b', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' },
+  avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  cameraBtn: { position: 'absolute', bottom: '2px', right: '2px', backgroundColor: '#3f3f46', border: '1px solid #52525b', padding: '8px', borderRadius: '50%', cursor: 'pointer', display: 'flex', boxShadow: '0 2px 6px rgba(0,0,0,0.5)' },
+  roleBadge: { backgroundColor: '#3f3f46', color: '#ffffff', border: '1px solid #52525b', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '12px', fontWeight: '700', display: 'inline-block' },
+  activeBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600', display: 'inline-block' },
+  errorAlert: { backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem' },
+  successAlert: { backgroundColor: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#22c55e', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem' },
+  emptyBox: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', textAlign: 'center', color: '#71717a', gap: '12px' },
+  emptyBoxCompact: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center', color: '#71717a', gap: '8px', backgroundColor: '#18181b', borderRadius: '10px', border: '1px solid #3f3f46' },
+  historyBtn: { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' },
+
+  activityProfileSection: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px', padding: '16px' },
+  activityProfileHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' },
+  activityProfileGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' },
+  activityProfileCard: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '4px' },
+  actLabel: { fontSize: '0.72rem', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' },
+  actVal: { fontSize: '0.85rem', color: '#f4f4f5', fontWeight: '600' },
+
+  paymentCard: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' },
+  paymentCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #27272a', paddingBottom: '8px' },
+  paymentBadgeSuccess: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700' },
+  paymentDetailsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', fontSize: '0.8rem' },
+  paySubLabel: { color: '#a1a1aa', marginRight: '6px' },
+  paySubValue: { color: '#f4f4f5', fontWeight: '600' },
+
   gatewayGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' },
-  gatewayCard: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' },
-  connectedBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '700' },
+  gatewayCard: { backgroundColor: '#18181b', padding: '18px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '12px' },
+  connectedBadge: { backgroundColor: '#15803d', color: '#ffffff', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' },
   keyRow: { display: 'flex', alignItems: 'center', gap: '6px' },
-
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalContent: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '100%' },
-  modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' },
   closeBtn: { background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer' },
   modalForm: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -1466,34 +1813,13 @@ const styles = {
   modalInput: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none' },
   modalSelect: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', cursor: 'pointer' },
   formRow: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
+  uploadBox: { backgroundColor: '#18181b', border: '1px dashed #3f3f46', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' },
+  uploadLabelBtn: { alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ffffff', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' },
+  imagePreviewRow: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+  imgBadgeWrapper: { position: 'relative' },
+  previewThumb: { width: '50px', height: '50px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #3f3f46' },
+  removeImgBtn: { position: 'absolute', top: '-4px', right: '-4px', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
   modalActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' },
   cancelBtn: { padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer' },
-  submitModalBtn: { padding: '10px 18px', borderRadius: '8px', border: '1px solid #52525b', backgroundColor: '#3b82f6', color: '#ffffff', fontWeight: '600', cursor: 'pointer' },
-
-  errorAlert: { backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '10px', borderRadius: '8px', fontSize: '0.85rem' },
-  successAlert: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '10px', borderRadius: '8px', fontSize: '0.85rem' },
-
-  modalTwoColumn: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px', marginTop: '10px' },
-  leftSeatColumn: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column' },
-  seatHeaderFlex: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
-  legendRow: { display: 'flex', gap: '8px', fontSize: '0.68rem', color: '#a1a1aa' },
-  legendItem: { display: 'flex', alignItems: 'center', gap: '4px' },
-  legendBox: { width: '8px', height: '8px', borderRadius: '2px' },
-  adminNoteText: { fontSize: '0.7rem', color: '#71717a', marginBottom: '10px' },
-  busChassis: { border: '2px solid #3f3f46', borderRadius: '16px 16px 8px 8px', padding: '14px 10px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', boxSizing: 'border-box' },
-  driverCabinRow: { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px', marginBottom: '10px' },
-  driverIconBadge: { fontSize: '0.72rem', color: '#a1a1aa', fontWeight: '600' },
-  steeringWheel: { fontSize: '0.85rem' },
-  verticalSeatContainer: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px', width: '100%' },
-  busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
-  seatPair: { display: 'flex', gap: '6px' },
-  compactSeat: { width: '38px', height: '36px', borderRadius: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 0, border: 'none', color: '#ffffff', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer' },
-  aisleGap: { flex: 1, minWidth: '20px' },
-  rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '14px' },
-  imageGalleryContainer: { backgroundColor: '#18181b', borderRadius: '12px', padding: '10px', border: '1px solid #3f3f46' },
-  mainLargeImg: { width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #3f3f46' },
-  largeImgPlaceholder: { width: '100%', height: '180px', borderRadius: '8px', backgroundColor: '#27272a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#71717a', gap: '6px', fontSize: '0.8rem' },
-  thumbnailRow: { display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'auto' },
-  thumbImg: { width: '50px', height: '38px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer' },
-  bookingSummaryBox: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46' }
+  submitModalBtn: { padding: '10px 18px', borderRadius: '8px', border: '1px solid #52525b', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer' }
 };
