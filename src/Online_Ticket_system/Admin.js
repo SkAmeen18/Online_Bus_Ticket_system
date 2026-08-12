@@ -86,7 +86,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     };
   });
 
-  // Zero default routes: Starts empty if nothing is cached
   const [buses, setBuses] = useState(() => {
     const savedBuses = localStorage.getItem('app_buses');
     return savedBuses ? JSON.parse(savedBuses) : [];
@@ -119,10 +118,9 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   });
   const [editMsg, setEditMsg] = useState({ type: '', text: '' });
 
-  // Fetch buses, registered users, and tickets live from backend database
+  // Fetch buses, registered users, and tickets live from MongoDB backend
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Fetch Buses
       try {
         const res = await fetch(`${API_BASE}/buses`);
         if (res.ok) {
@@ -134,7 +132,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         console.warn('Backend unavailable, using cached bus data.');
       }
 
-      // 2. Fetch Live Registered Users from MongoDB
       try {
         const res = await fetch(`${API_BASE}/users`);
         if (res.ok) {
@@ -143,12 +140,10 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
           localStorage.setItem('app_users', JSON.stringify(data));
         }
       } catch (err) {
-        console.warn('Backend user fetch failed, using local fallback.');
         const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
         setRegisteredUsers(loadedUsers);
       }
 
-      // 3. Fetch Tickets
       try {
         const res = await fetch(`${API_BASE}/tickets`);
         if (res.ok) {
@@ -157,7 +152,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
           localStorage.setItem('app_tickets', JSON.stringify(data));
         }
       } catch (err) {
-        console.warn('Backend ticket fetch failed, using local fallback.');
         const loadedTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
         setTicketSales(loadedTickets);
       }
@@ -180,7 +174,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     }, 0);
   }, [ticketSales]);
 
-  // Filter out admin/staff accounts to display only real passenger sign-ups
   const realPassengers = useMemo(() => {
     return registeredUsers.filter((u) => {
       const isRoleAdmin = u.role === 'admin' || u.isAdmin === true;
@@ -191,7 +184,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     });
   }, [registeredUsers]);
 
-  // Search filtering over real passengers
   const filteredUsers = useMemo(() => {
     if (!userSearchTerm.trim()) return realPassengers;
     const term = userSearchTerm.toLowerCase();
@@ -429,7 +421,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
   return (
     <div style={styles.container}>
-      {/* 1. HOME TAB */}
+      {/* HOME TAB */}
       {activeTab === 'home' && (
         <>
           <div style={styles.headerRow}>
@@ -548,7 +540,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         </>
       )}
 
-      {/* 2. PROFILE TAB */}
+      {/* PROFILE TAB */}
       {activeTab === 'profile' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
@@ -742,7 +734,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         </div>
       )}
 
-      {/* 3. PAYMENT TAB */}
+      {/* PAYMENT TAB */}
       {activeTab === 'payment' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={styles.card}>
@@ -774,7 +766,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         </div>
       )}
 
-      {/* 4. ABOUT TAB */}
+      {/* ABOUT TAB */}
       {activeTab === 'about' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{
@@ -1193,7 +1185,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         </div>
       )}
 
-      {/* COMPLETE USER PROFILE & PAYMENT HISTORY MODAL */}
+      {/* USER PROFILE & PAYMENT HISTORY MODAL */}
       {selectedUserHistory && (() => {
         const userEmail = selectedUserHistory.email || selectedUserHistory.emailOrPhone || 'N/A';
         const userPhone = selectedUserHistory.phone || 'N/A';
@@ -1216,7 +1208,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                 </button>
               </div>
 
-              {/* SECTION A: USER PROFILE INFO */}
+              {/* USER PROFILE INFO */}
               <div style={styles.activityProfileSection}>
                 <div style={styles.activityProfileHeader}>
                   <UserIcon size={18} color="#a1a1aa" />
@@ -1258,7 +1250,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                 </div>
               </div>
 
-              {/* SECTION B: PAYMENT & TRANSACTION LOGS */}
+              {/* PAYMENT & TRANSACTION LOGS */}
               <div style={{ marginTop: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f4f4f5', fontWeight: '700', fontSize: '0.95rem' }}>
@@ -1318,7 +1310,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
                           <div>
                             <span style={styles.paySubLabel}>Date & Time:</span>
-                            <span style={styles.paySubValue}>{payment.date || payment.bookingDate || 'Recent'}</span>
+                            <span style={styles.paySubValue}>{payment.purchaseDate || payment.date || 'Recent'}</span>
                           </div>
                         </div>
                       </div>
@@ -1541,285 +1533,102 @@ const styles = {
   tableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
   countBadge: { backgroundColor: '#3f3f46', color: '#a1a1aa', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '20px', fontWeight: '600' },
   addBtn: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#3f3f46', color: '#ffffff', border: '1px solid #52525b', padding: '10px 18px', borderRadius: '10px', fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer' },
-
   searchWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
   searchIcon: { position: 'absolute', left: '10px' },
-  searchInput: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '8px', padding: '6px 12px 6px 30px', color: '#ffffff', fontSize: '0.8rem', outline: 'none', width: '160px' },
-
-  routeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
-  routeBox: {
-    backgroundColor: '#18181b',
-    borderRadius: '14px',
-    border: '1px solid #3f3f46',
-    overflow: 'hidden',
-    cursor: 'pointer',
-    transition: 'transform 0.2s ease, border-color 0.2s ease',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-  },
-  boxImageArea: { position: 'relative', height: '140px', backgroundColor: '#27272a' },
+  searchInput: { padding: '6px 12px 6px 32px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', fontSize: '0.82rem' },
+  emptyBox: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', gap: '12px', color: '#71717a' },
+  emptyBoxCompact: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', gap: '8px', color: '#71717a', backgroundColor: '#18181b', borderRadius: '8px', border: '1px solid #3f3f46' },
+  routeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' },
+  routeBox: { backgroundColor: '#18181b', borderRadius: '12px', border: '1px solid #3f3f46', overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column' },
+  boxImageArea: { height: '140px', position: 'relative', backgroundColor: '#09090b' },
   boxImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  boxImgPlaceholder: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#71717a', gap: '6px', fontSize: '0.8rem' },
-  boxIdTag: { position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(24, 24, 27, 0.85)', color: '#d4d4d8', padding: '4px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '0.75rem', backdropFilter: 'blur(4px)' },
-  boxDeleteBtn: { position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(239, 68, 68, 0.9)', color: '#ffffff', border: 'none', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-  boxBody: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-between' },
-  operatorName: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  boxRouteTitle: { fontSize: '1.05rem', fontWeight: '700', color: '#f4f4f5', margin: '2px 0' },
-  seatSummaryRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#a1a1aa' },
+  boxImgPlaceholder: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#52525b', fontSize: '0.8rem' },
+  boxIdTag: { position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0, 0, 0, 0.65)', color: '#ffffff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700' },
+  boxDeleteBtn: { position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(239, 68, 68, 0.85)', border: 'none', color: '#ffffff', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
+  boxBody: { padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-between' },
+  operatorName: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '700', textTransform: 'uppercase' },
+  boxRouteTitle: { fontSize: '1rem', fontWeight: '700', color: '#f4f4f5' },
+  seatSummaryRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#a1a1aa' },
   seatSummaryText: { color: '#a1a1aa' },
-  bookedCountBadge: { backgroundColor: '#3f3f46', color: '#38bdf8', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' },
-  boxFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '10px', borderTop: '1px solid #27272a' },
-  fareLabel: { fontSize: '0.7rem', color: '#71717a', display: 'block' },
-  boxFare: { fontSize: '1.1rem', fontWeight: '800', color: '#22c55e' },
-  viewDetailsHint: { fontSize: '0.75rem', color: '#a1a1aa', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' },
-
-  modalContentLarge: {
-    backgroundColor: '#27272a',
-    border: '1px solid #3f3f46',
-    borderRadius: '16px',
-    padding: '24px',
-    width: '90%',
-    maxWidth: '920px',
-    maxHeight: '90vh',
-    overflowY: 'auto'
-  },
-  modalTwoColumn: {
-    display: 'grid',
-    gridTemplateColumns: '320px 1fr',
-    gap: '24px',
-    marginTop: '10px'
-  },
-  leftSeatColumn: {
-    backgroundColor: '#18181b',
-    padding: '16px',
-    borderRadius: '12px',
-    border: '1px solid #3f3f46',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  seatHeaderFlex: {
-    display: 'flex',
-    justify: 'space-between',
-    alignItems: 'center',
-    marginBottom: '4px'
-  },
-  adminNoteText: {
-    fontSize: '0.68rem',
-    color: '#38bdf8',
-    fontStyle: 'italic',
-    marginBottom: '12px'
-  },
-  legendRow: {
-    display: 'flex',
-    gap: '8px',
-    fontSize: '0.7rem',
-    color: '#a1a1aa'
-  },
-  legendItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
-  },
-  legendBox: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '2px'
-  },
-  busChassis: {
-    border: '2px solid #3f3f46',
-    borderRadius: '20px 20px 10px 10px',
-    padding: '16px 14px',
-    backgroundColor: '#09090b',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    width: '100%',
-    boxSizing: 'border-box'
-  },
-  driverCabinRow: {
-    width: '100%',
-    display: 'flex',
-    justify: 'space-between',
-    alignItems: 'center',
-    borderBottom: '1px dashed #3f3f46',
-    paddingBottom: '8px',
-    marginBottom: '12px'
-  },
-  driverIconBadge: {
-    fontSize: '0.75rem',
-    color: '#a1a1aa',
-    fontWeight: '600'
-  },
-  steeringWheel: {
-    fontSize: '0.9rem'
-  },
-  verticalSeatContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    maxHeight: '340px',
-    overflowY: 'auto',
-    paddingRight: '4px',
-    width: '100%'
-  },
-  busRowGroup: {
-    display: 'flex',
-    justify: 'space-between',
-    alignItems: 'center',
-    width: '100%'
-  },
-  seatPair: {
-    display: 'flex',
-    gap: '6px'
-  },
-  compactSeat: {
-    width: '40px',
-    height: '38px',
-    borderRadius: '8px',
-    display: 'flex',
-    justify: 'center',
-    alignItems: 'center',
-    textAlign: 'center',
-    padding: 0,
-    margin: 0,
-    border: 'none',
-    lineHeight: 'normal',
-    color: '#ffffff',
-    fontSize: '0.8rem',
-    fontWeight: '700',
-    cursor: 'pointer',
-    boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)',
-    userSelect: 'none',
-    transition: 'opacity 0.15s ease'
-  },
-  aisleGap: {
-    flex: 1,
-    minWidth: '24px'
-  },
-  rightInfoColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px'
-  },
-  imageGalleryContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: '12px',
-    padding: '12px',
-    border: '1px solid #3f3f46'
-  },
-  mainLargeImg: {
-    width: '100%',
-    height: '210px',
-    objectFit: 'cover',
-    borderRadius: '8px',
-    border: '1px solid #3f3f46'
-  },
-  largeImgPlaceholder: {
-    width: '100%',
-    height: '210px',
-    borderRadius: '8px',
-    backgroundColor: '#27272a',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justify: 'center',
-    color: '#71717a',
-    gap: '8px',
-    fontSize: '0.85rem'
-  },
-  thumbnailRow: {
-    display: 'flex',
-    gap: '8px',
-    marginTop: '10px',
-    overflowX: 'auto',
-    paddingBottom: '2px'
-  },
-  thumbImg: {
-    width: '60px',
-    height: '45px',
-    borderRadius: '6px',
-    objectFit: 'cover',
-    border: '1px solid #3f3f46',
-    cursor: 'pointer'
-  },
-  detailGridStacked: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px'
-  },
-  detailCard: {
-    backgroundColor: '#18181b',
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid #3f3f46',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px'
-  },
-  detailLabel: {
-    fontSize: '0.75rem',
-    color: '#a1a1aa',
-    fontWeight: '600'
-  },
-  detailValue: {
-    fontSize: '0.95rem',
-    color: '#f4f4f5',
-    fontWeight: '700'
-  },
-
-  table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left' },
-  th: { padding: '14px 16px', borderBottom: '1px solid #3f3f46', color: '#a1a1aa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  tr: { borderBottom: '1px solid #3f3f46' },
-  td: { padding: '14px 16px', fontSize: '0.85rem', color: '#d4d4d8' },
-  userIdBadge: { backgroundColor: '#18181b', color: '#d4d4d8', border: '1px solid #3f3f46', padding: '3px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '0.75rem' },
+  bookedCountBadge: { backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700' },
+  boxFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid #27272a', paddingTop: '10px' },
+  fareLabel: { fontSize: '0.7rem', color: '#a1a1aa' },
+  boxFare: { fontSize: '1rem', fontWeight: '700', color: '#22c55e' },
+  viewDetailsHint: { fontSize: '0.78rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' },
   avatarContainer: { position: 'relative' },
-  avatarCircle: { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#18181b', border: '2px solid #52525b', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' },
+  avatarCircle: { width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#18181b', border: '2px solid #52525b', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  cameraBtn: { position: 'absolute', bottom: '2px', right: '2px', backgroundColor: '#3f3f46', border: '1px solid #52525b', padding: '8px', borderRadius: '50%', cursor: 'pointer', display: 'flex', boxShadow: '0 2px 6px rgba(0,0,0,0.5)' },
-  roleBadge: { backgroundColor: '#3f3f46', color: '#ffffff', border: '1px solid #52525b', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '12px', fontWeight: '700', display: 'inline-block' },
-  activeBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600', display: 'inline-block' },
-  errorAlert: { backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem' },
-  successAlert: { backgroundColor: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#22c55e', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem' },
-  emptyBox: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', textAlign: 'center', color: '#71717a', gap: '12px' },
-  emptyBoxCompact: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center', color: '#71717a', gap: '8px', backgroundColor: '#18181b', borderRadius: '10px', border: '1px solid #3f3f46' },
-  historyBtn: { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ffffff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' },
-
-  activityProfileSection: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px', padding: '16px' },
-  activityProfileHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' },
-  activityProfileGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' },
-  activityProfileCard: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '4px' },
-  actLabel: { fontSize: '0.72rem', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' },
-  actVal: { fontSize: '0.85rem', color: '#f4f4f5', fontWeight: '600' },
-
-  paymentCard: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' },
-  paymentCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #27272a', paddingBottom: '8px' },
-  paymentBadgeSuccess: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700' },
-  paymentDetailsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', fontSize: '0.8rem' },
-  paySubLabel: { color: '#a1a1aa', marginRight: '6px' },
-  paySubValue: { color: '#f4f4f5', fontWeight: '600' },
-
+  cameraBtn: { position: 'absolute', bottom: '0', right: '0', backgroundColor: '#38bdf8', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
+  roleBadge: { backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: '600' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' },
+  th: { padding: '12px 16px', color: '#a1a1aa', fontWeight: '600', borderBottom: '1px solid #3f3f46' },
+  td: { padding: '12px 16px', color: '#d4d4d8', borderBottom: '1px solid #27272a' },
+  tr: { backgroundColor: '#27272a' },
+  userIdBadge: { fontFamily: 'monospace', color: '#a1a1aa', fontSize: '0.8rem' },
+  activeBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700' },
+  historyBtn: { display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#f4f4f5', fontSize: '0.75rem', cursor: 'pointer' },
   gatewayGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' },
-  gatewayCard: { backgroundColor: '#18181b', padding: '18px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '12px' },
-  connectedBadge: { backgroundColor: '#15803d', color: '#ffffff', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' },
+  gatewayCard: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '12px' },
+  connectedBadge: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' },
   keyRow: { display: 'flex', alignItems: 'center', gap: '6px' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modalContent: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '100%' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' },
+  modalContent: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%' },
+  modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' },
   closeBtn: { background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer' },
-  modalForm: { display: 'flex', flexDirection: 'column', gap: '16px' },
+  errorAlert: { backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '10px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', fontSize: '0.85rem' },
+  successAlert: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', padding: '10px', borderRadius: '8px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.85rem' },
+  modalForm: { display: 'flex', flexDirection: 'column', gap: '14px' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  modalLabel: { fontSize: '0.8rem', color: '#a1a1aa', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' },
-  modalInput: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none' },
-  modalSelect: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', cursor: 'pointer' },
-  formRow: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
-  uploadBox: { backgroundColor: '#18181b', border: '1px dashed #3f3f46', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' },
-  uploadLabelBtn: { alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#3f3f46', color: '#ffffff', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' },
+  modalLabel: { fontSize: '0.78rem', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' },
+  modalInput: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', fontSize: '0.85rem' },
+  modalSelect: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none', fontSize: '0.85rem' },
+  formRow: { display: 'flex', gap: '12px' },
+  modalActions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' },
+  submitModalBtn: { padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#22c55e', color: '#09090b', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' },
+  cancelBtn: { padding: '10px 18px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#a1a1aa', fontSize: '0.85rem', cursor: 'pointer' },
+  modalTwoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' },
+  leftSeatColumn: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46' },
+  seatHeaderFlex: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
+  legendRow: { display: 'flex', gap: '10px', fontSize: '0.7rem', color: '#a1a1aa' },
+  legendItem: { display: 'flex', alignItems: 'center', gap: '4px' },
+  legendBox: { width: '10px', height: '10px', borderRadius: '2px' },
+  adminNoteText: { fontSize: '0.7rem', color: '#71717a', marginBottom: '10px' },
+  busChassis: { border: '2px solid #3f3f46', borderRadius: '16px', padding: '12px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', gap: '12px' },
+  driverCabinRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px' },
+  driverIconBadge: { fontSize: '0.75rem', color: '#a1a1aa' },
+  steeringWheel: { fontSize: '0.9rem' },
+  verticalSeatContainer: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto' },
+  busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  seatPair: { display: 'flex', gap: '6px' },
+  aisleGap: { flex: 1 },
+  compactSeat: { width: '36px', height: '34px', borderRadius: '6px', border: 'none', color: '#ffffff', fontWeight: '700', fontSize: '0.75rem', cursor: 'pointer' },
+  rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  imageGalleryContainer: { height: '160px', backgroundColor: '#18181b', borderRadius: '8px', border: '1px solid #3f3f46', overflow: 'hidden' },
+  mainLargeImg: { width: '100%', height: '120px', objectFit: 'cover' },
+  thumbnailRow: { display: 'flex', gap: '6px', padding: '6px', backgroundColor: '#09090b' },
+  thumbImg: { width: '36px', height: '24px', objectFit: 'cover', borderRadius: '4px', cursor: 'pointer' },
+  largeImgPlaceholder: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#52525b', fontSize: '0.8rem' },
+  detailGridStacked: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  detailCard: { backgroundColor: '#18181b', padding: '10px 12px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '2px' },
+  detailLabel: { fontSize: '0.7rem', color: '#a1a1aa' },
+  detailValue: { fontSize: '0.85rem', color: '#f4f4f5', fontWeight: '700' },
+  uploadBox: { border: '1px dashed #3f3f46', borderRadius: '8px', padding: '12px', backgroundColor: '#18181b', display: 'flex', flexDirection: 'column', gap: '10px' },
+  uploadLabelBtn: { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#27272a', color: '#ffffff', border: '1px solid #3f3f46', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', width: 'fit-content' },
   imagePreviewRow: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  imgBadgeWrapper: { position: 'relative' },
-  previewThumb: { width: '50px', height: '50px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #3f3f46' },
-  removeImgBtn: { position: 'absolute', top: '-4px', right: '-4px', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-  modalActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' },
-  cancelBtn: { padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer' },
-  submitModalBtn: { padding: '10px 18px', borderRadius: '8px', border: '1px solid #52525b', backgroundColor: '#3f3f46', color: '#ffffff', fontWeight: '600', cursor: 'pointer' }
+  imgBadgeWrapper: { position: 'relative', width: '48px', height: '48px' },
+  previewThumb: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #3f3f46' },
+  removeImgBtn: { position: 'absolute', top: '-4px', right: '-4px', backgroundColor: '#ef4444', border: 'none', color: '#ffffff', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
+  activityProfileSection: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '12px' },
+  activityProfileHeader: { display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #27272a', paddingBottom: '8px' },
+  activityProfileGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' },
+  activityProfileCard: { backgroundColor: '#27272a', padding: '10px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '2px' },
+  actLabel: { fontSize: '0.7rem', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' },
+  actVal: { fontSize: '0.82rem', color: '#f4f4f5', fontWeight: '600' },
+  paymentCard: { backgroundColor: '#18181b', padding: '14px', borderRadius: '10px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '10px' },
+  paymentCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #27272a', paddingBottom: '8px' },
+  paymentBadgeSuccess: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700' },
+  paymentDetailsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' },
+  paySubLabel: { fontSize: '0.7rem', color: '#a1a1aa', display: 'block' },
+  paySubValue: { fontSize: '0.8rem', color: '#d4d4d8' }
 };

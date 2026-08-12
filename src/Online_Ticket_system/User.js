@@ -13,17 +13,12 @@ import {
   MapPin,
   ShieldCheck,
   Award,
-  HelpCircle,
   Info,
   Edit3,
-  Check,
   Lock,
   Camera,
   Receipt,
-  RefreshCw,
-  Calendar,
-  Sparkles,
-  DollarSign
+  RefreshCw
 } from 'lucide-react';
 
 const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
@@ -68,7 +63,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
   
   const [selectedBus, setSelectedBus] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('bKash');
@@ -264,7 +258,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
   const handleOpenBus = (bus) => {
     setSelectedBus(bus);
     setSelectedSeats([]);
-    setActiveImageIndex(0);
     setBookingSuccess(null);
   };
 
@@ -276,6 +269,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
     setIsCheckoutOpen(true);
   };
 
+  // CONFIRM BOOKING & SAVE TO MONGODB TICKET SECTION
   const handleConfirmBooking = async (e) => {
     e.preventDefault();
 
@@ -294,7 +288,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
 
     try {
-      // 1. Reserve seats in MongoDB Atlas
+      // 1. Reserve seats on bus route in MongoDB Atlas
       const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -305,7 +299,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         throw new Error('Failed to update reserved seats on server.');
       }
 
-      // 2. Save ticket in MongoDB Atlas
+      // 2. Save new ticket object into MongoDB Atlas ticket collection
       const newTicketRecord = {
         id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
         busId: busId,
@@ -330,13 +324,17 @@ export default function User({ activeTab = 'Home', user = {} }) {
         })
       };
 
-      await fetch(`${API_BASE}/tickets`, {
+      const resTicket = await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTicketRecord)
       });
 
-      // 3. Refresh Data
+      if (!resTicket.ok) {
+        throw new Error('Failed to create ticket record in MongoDB.');
+      }
+
+      // 3. Refresh live UI data
       fetchBuses();
       fetchUserTickets();
 
@@ -358,7 +356,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       }));
 
     } catch (err) {
-      alert('Transaction failed. Please check internet connection.');
+      alert(`Transaction failed: ${err.message || 'Please check connection.'}`);
     }
   };
 
@@ -367,7 +365,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
   return (
     <div style={styles.container}>
       
-      {/* 1. HOME TAB */}
+      {/* HOME TAB */}
       {(currentTab === 'home') && (
         <>
           <div style={styles.searchBanner}>
@@ -498,7 +496,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         </>
       )}
 
-      {/* 2. ABOUT TAB */}
+      {/* ABOUT TAB */}
       {(currentTab === 'about') && (
         <div style={styles.contentSection}>
           <div style={styles.aboutHeader}>
@@ -540,7 +538,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         </div>
       )}
 
-      {/* 3. TICKETS / HISTORY TAB */}
+      {/* TICKETS / HISTORY TAB */}
       {(currentTab === 'tickets' || currentTab === 'history') && (
         <div style={styles.contentSection}>
           <div style={styles.sectionHeader}>
@@ -617,7 +615,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         </div>
       )}
 
-      {/* 4. PROFILE TAB */}
+      {/* PROFILE TAB */}
       {(currentTab === 'profile') && (
         <div style={styles.contentSection}>
           <div style={styles.profileCard}>
@@ -782,7 +780,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
               <div style={styles.successReceiptCard}>
                 <CheckCircle2 size={48} color="#22c55e" />
                 <h3 style={{ margin: '8px 0 0 0', color: '#f4f4f5' }}>Booking Successful!</h3>
-                <p style={{ color: '#a1a1aa', fontSize: '0.9rem', margin: '4px 0 16px 0' }}>Your bus seats are reserved and confirmed.</p>
+                <p style={{ color: '#a1a1aa', fontSize: '0.9rem', margin: '4px 0 16px 0' }}>Your bus seats are reserved and saved in MongoDB database.</p>
 
                 <div style={styles.receiptDetailsBox}>
                   <div style={styles.receiptRow}><span>Operator:</span><strong>{bookingSuccess.busName}</strong></div>
