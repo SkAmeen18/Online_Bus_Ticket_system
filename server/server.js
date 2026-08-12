@@ -1,141 +1,81 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+require('dotenv').config();
 
 const app = express();
 
-// Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
-// ------------------------------------------------------------------
-// MONGOOSE SCHEMAS & MODELS
-// ------------------------------------------------------------------
+// --- 1. Connect MongoDB Database ---
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/bus_booking';
 
-// 1. User Schema (Passenger & Admin)
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Connected to MongoDB Atlas successfully!'))
+  .catch((err) => console.error('MongoDB Connection Error:', err));
+
+// --- 2. Schemas & Models ---
 const userSchema = new mongoose.Schema({
-  name: { type: String, default: 'Passenger' },
-  email: { type: String, required: true },
-  phone: { type: String },
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  phone: { type: String, default: '' },
   password: { type: String, required: true },
-  role: { type: String, default: 'passenger' }
-}, { strict: false });
+  role: { type: String, default: 'user', enum: ['user', 'admin'] },
+  joined: { type: Date, default: Date.now },
+  avatar: { type: String, default: '' }
+});
 
 const User = mongoose.model('User', userSchema);
 
-// 2. Bus Schema
 const busSchema = new mongoose.Schema({
   id: Number,
   name: { type: String, required: true },
-  busNumber: String,
-  route: String,
-  from: String,
-  to: String,
-  departureTime: String,
-  arrivalTime: String,
-  fare: mongoose.Schema.Types.Mixed,
-  seats: { type: Number, default: 40 },
-  busType: String,
+  busNumber: { type: String, default: '' },
+  from: { type: String, required: true },
+  to: { type: String, required: true },
+  route: { type: String, default: '' },
+  fare: { type: String, required: true },
+  seats: { type: Number, default: 36 },
   bookedSeats: { type: [String], default: [] },
-  images: [String]
-});
+  busType: { type: String, default: 'AC Executive' },
+  arrivalTime: { type: String, default: 'N/A' },
+  departureTime: { type: String, default: 'N/A' },
+  estimatedHours: { type: String, default: 'N/A' },
+  images: { type: [String], default: [] }
+}, { timestamps: true });
 
 const Bus = mongoose.model('Bus', busSchema);
 
-// 3. Ticket Schema (Lenient format to prevent validation errors)
 const ticketSchema = new mongoose.Schema({
-  id: { type: String, default: () => `TICK-${Math.floor(100000 + Math.random() * 900000)}` },
-  busId: { type: mongoose.Schema.Types.Mixed },
-  userEmail: { type: String, default: 'guest@example.com' },
-  passengerEmail: { type: String, default: 'guest@example.com' },
-  passengerPhone: { type: String, default: 'N/A' },
-  passengerName: { type: String, default: 'Passenger' },
-  busName: { type: String, default: 'Bus Service' },
-  operator: { type: String, default: 'Bus Service' },
-  from: { type: String, default: '' },
-  to: { type: String, default: '' },
-  seats: { type: [String], default: [] },
-  seatNumber: { type: String, default: '' },
-  fare: { type: mongoose.Schema.Types.Mixed, default: 0 },
-  price: { type: mongoose.Schema.Types.Mixed, default: 0 },
-  paymentMethod: { type: String, default: 'bKash' },
-  trxId: { type: String, default: () => `TRX-${Math.floor(10000000 + Math.random() * 90000000)}` },
-  purchaseDate: { type: String, default: () => new Date().toLocaleString() },
-  date: { type: Date, default: Date.now }
-}, { strict: false });
+  id: String,
+  busId: String,
+  userEmail: String,
+  userPhone: String,
+  passengerEmail: String,
+  passengerPhone: String,
+  passengerName: String,
+  busName: String,
+  operator: String,
+  from: String,
+  to: String,
+  route: String,
+  seats: [String],
+  seatNumber: String,
+  fare: mongoose.Schema.Types.Mixed,
+  price: mongoose.Schema.Types.Mixed,
+  paymentMethod: String,
+  trxId: String,
+  purchaseDate: { type: String, default: () => new Date().toLocaleString() }
+}, { timestamps: true });
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
 
-// Helper function to query bus by ObjectId or Numeric ID
-const getBusQuery = (busId) => {
-  if (!busId) return null;
-  if (mongoose.Types.ObjectId.isValid(busId)) {
-    return { _id: busId };
-  }
-  const numId = Number(busId);
-  if (!isNaN(numId)) {
-    return { $or: [{ id: numId }, { _id: busId }] };
-  }
-  return { id: busId };
-};
+// --- 3. API Routes ---
 
-// ------------------------------------------------------------------
-// AUTHENTICATION ENDPOINTS
-// ------------------------------------------------------------------
-
-// Login Handler (Supports Email / Mobile Number Sign In)
-const handleLogin = async (req, res) => {
-  try {
-    const { email, phone, identifier, password } = req.body;
-    const loginInput = (email || identifier || phone || '').toString().trim().toLowerCase();
-
-    if (!loginInput || !password) {
-      return res.status(400).json({ message: 'Email/Mobile and password are required.' });
-    }
-
-    // Find user by email or phone
-    const user = await User.findOne({
-      $or: [
-        { email: new RegExp(`^${loginInput}$`, 'i') },
-        { phone: loginInput }
-      ]
-    });
-
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid login credentials.' });
-    }
-
-    // Direct password match
-    if (user.password !== password) {
-      return res.status(401).json({ message: 'Invalid login credentials.' });
-    }
-
-    return res.json({
-      message: 'Sign in successful',
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role || 'passenger'
-      }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    return res.status(500).json({ message: 'Server error during sign in', error: error.message });
-  }
-};
-
-// Registered routes to cover all frontend path variations
-app.post('/api/signin', handleLogin);
-app.post('/api/users/signin', handleLogin);
-app.post('/api/login', handleLogin);
-app.post('/api/users/login', handleLogin);
-app.post('/api/auth/login', handleLogin);
-
-// Signup Handler
-const handleSignup = async (req, res) => {
+// Sign Up Route
+app.post('/api/signup', async (req, res) => {
   try {
     const { name, email, phone, password, role } = req.body;
 
@@ -143,145 +83,228 @@ const handleSignup = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const cleanEmail = email.trim().toLowerCase();
+    const existingUser = await User.findOne({ email: cleanEmail });
+
     if (existingUser) {
-      return res.status(400).json({ message: 'User with this email already exists.' });
+      return res.status(400).json({ message: 'User already exists with this email address.' });
     }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
       name: name || 'Passenger',
-      email: email.toLowerCase(),
+      email: cleanEmail,
       phone: phone || '',
-      password: password,
-      role: role || 'passenger'
+      password: hashedPassword,
+      role: role || 'user'
     });
 
     await newUser.save();
-    return res.status(201).json({ message: 'User registered successfully', user: newUser });
+
+    res.status(201).json({
+      message: 'Account created successfully',
+      user: {
+        id: newUser._id,
+        _id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role,
+        joined: newUser.joined,
+        avatar: newUser.avatar
+      }
+    });
   } catch (error) {
-    return res.status(500).json({ message: 'Error creating user', error: error.message });
+    console.error('Signup error:', error);
+    res.status(500).json({ message: 'Server error during signup', error: error.message });
   }
-};
+});
 
-app.post('/api/users/register', handleSignup);
-app.post('/api/register', handleSignup);
-app.post('/api/signup', handleSignup);
+// Sign In Route
+app.post('/api/signin', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
 
-// ------------------------------------------------------------------
-// BUS & TICKET ENDPOINTS
-// ------------------------------------------------------------------
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ 
+      $or: [{ email: cleanEmail }, { phone: email }] 
+    });
 
-// GET /api/buses
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid email/phone or password.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid email/phone or password.' });
+    }
+
+    res.status(200).json({
+      message: 'Sign in successful',
+      user: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        joined: user.joined,
+        avatar: user.avatar
+      }
+    });
+  } catch (error) {
+    console.error('Signin error:', error);
+    res.status(500).json({ message: 'Server error during signin', error: error.message });
+  }
+});
+
+// User Profile Update & Password Change Route
+app.put('/api/users/profile', async (req, res) => {
+  try {
+    const { email, name, phone, avatar, newPassword } = req.body;
+    if (!email) return res.status(400).json({ message: 'User email is required' });
+
+    const updateFields = { name, phone, avatar };
+
+    if (newPassword && newPassword.trim().length >= 6) {
+      updateFields.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { email: email.trim().toLowerCase() },
+      { $set: updateFields },
+      { new: true, select: '-password' }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User profile not found.' });
+    }
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update user profile', error: error.message });
+  }
+});
+
+// Fetch All Users Route (Admin Panel)
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await User.find({}, '-password').sort({ joined: -1 }).lean();
+    const formattedUsers = users.map(u => ({
+      ...u,
+      id: u._id,
+      emailOrPhone: u.email
+    }));
+    res.status(200).json(formattedUsers);
+  } catch (error) {
+    console.error('Fetch users error:', error);
+    res.status(500).json({ message: 'Failed to fetch registered users.' });
+  }
+});
+
+// Buses Routes
 app.get('/api/buses', async (req, res) => {
   try {
     const { from, to } = req.query;
-    const filter = {};
+    let query = {};
 
-    if (from && from !== 'Select District') filter.from = from;
-    if (to && to !== 'Select District') filter.to = to;
-
-    const buses = await Bus.find(filter);
-    res.json(buses);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching buses', error: error.message });
-  }
-});
-
-// PUT /api/buses/:id
-app.put('/api/buses/:id', async (req, res) => {
-  try {
-    const busId = req.params.id;
-    const { bookedSeats } = req.body;
-    const query = getBusQuery(busId);
-
-    const updatedBus = await Bus.findOneAndUpdate(
-      query,
-      { bookedSeats },
-      { new: true }
-    );
-
-    if (!updatedBus) {
-      return res.status(404).json({ message: 'Bus not found' });
+    if (from && from !== 'Select District' && from !== 'All Districts') {
+      query.from = new RegExp(`^${from.trim()}$`, 'i');
+    }
+    if (to && to !== 'Select District' && to !== 'All Districts') {
+      query.to = new RegExp(`^${to.trim()}$`, 'i');
     }
 
-    res.json(updatedBus);
+    const buses = await Bus.find(query).sort({ createdAt: -1 });
+    res.status(200).json(buses);
   } catch (error) {
-    res.status(500).json({ message: 'Error updating bus seats', error: error.message });
+    res.status(500).json({ message: 'Failed to fetch buses' });
   }
 });
 
-// GET /api/tickets
+app.post('/api/buses', async (req, res) => {
+  try {
+    const busData = req.body;
+    if (!busData.route) {
+      busData.route = `${busData.from} to ${busData.to}`;
+    }
+    const newBus = new Bus(busData);
+    await newBus.save();
+    res.status(201).json(newBus);
+  } catch (error) {
+    console.error('Create bus error:', error);
+    res.status(500).json({ message: 'Failed to add bus route' });
+  }
+});
+
+// Update Bus / Reserve Seats Route
+app.put('/api/buses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let updatedBus;
+    
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      updatedBus = await Bus.findByIdAndUpdate(id, { $set: req.body }, { new: true });
+    } else {
+      updatedBus = await Bus.findOneAndUpdate({ id: Number(id) }, { $set: req.body }, { new: true });
+    }
+
+    if (!updatedBus) {
+      return res.status(404).json({ message: 'Bus route not found' });
+    }
+    res.status(200).json(updatedBus);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update bus seat layout' });
+  }
+});
+
+app.delete('/api/buses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      await Bus.findByIdAndDelete(id);
+    } else {
+      await Bus.deleteOne({ id: Number(id) });
+    }
+    res.status(200).json({ message: 'Bus deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete bus' });
+  }
+});
+
+// Tickets Routes
 app.get('/api/tickets', async (req, res) => {
   try {
     const { email } = req.query;
-    const filter = email ? {
-      $or: [
-        { userEmail: new RegExp(`^${email}$`, 'i') },
-        { passengerEmail: new RegExp(`^${email}$`, 'i') }
-      ]
-    } : {};
-
-    const tickets = await Ticket.find(filter).sort({ date: -1 });
-    res.json(tickets);
+    let query = {};
+    if (email) {
+      query.$or = [
+        { userEmail: new RegExp(`^${email.trim()}$`, 'i') },
+        { passengerEmail: new RegExp(`^${email.trim()}$`, 'i') }
+      ];
+    }
+    const tickets = await Ticket.find(query).sort({ createdAt: -1 });
+    res.status(200).json(tickets);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching tickets', error: error.message });
+    res.status(500).json({ message: 'Failed to fetch tickets' });
   }
 });
 
-// POST /api/tickets
 app.post('/api/tickets', async (req, res) => {
   try {
-    const payload = req.body || {};
-
-    const seatArray = Array.isArray(payload.seats) && payload.seats.length > 0
-      ? payload.seats
-      : (payload.seatNumber ? payload.seatNumber.split(',').map(s => s.trim()) : []);
-
-    const rawFare = payload.fare || payload.price || 0;
-    const cleanFare = parseInt(rawFare.toString().replace(/\D/g, ''), 10) || 0;
-
-    const ticketData = {
-      ...payload,
-      id: payload.id || `TICK-${Math.floor(100000 + Math.random() * 900000)}`,
-      seats: seatArray,
-      seatNumber: seatArray.join(', '),
-      fare: cleanFare,
-      price: cleanFare,
-      userEmail: payload.userEmail || payload.passengerEmail || 'guest@example.com',
-      passengerEmail: payload.passengerEmail || payload.userEmail || 'guest@example.com',
-      trxId: payload.trxId || `TRX-${Math.floor(10000000 + Math.random() * 90000000)}`,
-      purchaseDate: payload.purchaseDate || new Date().toLocaleString()
-    };
-
-    const newTicket = new Ticket(ticketData);
-    const savedTicket = await newTicket.save();
-
-    // Lock bookedSeats on the corresponding Bus
-    if (payload.busId && seatArray.length > 0) {
-      const busQuery = getBusQuery(payload.busId);
-      if (busQuery) {
-        await Bus.findOneAndUpdate(busQuery, {
-          $addToSet: { bookedSeats: { $each: seatArray } }
-        });
-      }
-    }
-
-    res.status(201).json(savedTicket);
+    const newTicket = new Ticket(req.body);
+    await newTicket.save();
+    res.status(201).json(newTicket);
   } catch (error) {
-    console.error('❌ TICKET CREATION ERROR:', error);
-    res.status(500).json({ message: 'Failed to process ticket booking', error: error.message });
+    res.status(500).json({ message: 'Failed to save ticket transaction' });
   }
 });
 
-// ------------------------------------------------------------------
-// SERVER INITIALIZATION
-// ------------------------------------------------------------------
-const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb+srv://ameenali1801_db_user:maugxMR5bo13wsJ9@onlinebusticket.13ahrnm.mongodb.net/bus_booking_db?retryWrites=true&w=majority";
 const PORT = process.env.PORT || 5000;
-
-mongoose.connect(MONGO_URI)
-  .then(() => {
-    console.log('Connected to MongoDB Atlas successfully!');
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch(err => console.error('MongoDB connection error:', err));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
