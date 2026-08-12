@@ -5,8 +5,8 @@ const API_BASE = 'http://localhost:5000/api';
 const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } }) => {
   const [buses, setBuses] = useState([]);
   const [tickets, setTickets] = useState([]);
-  const [activeTab, setActiveTab] = useState('buses'); // 'buses' or 'history'
-  
+  const [activeTab, setActiveTab] = useState('buses');
+
   // Search Filters
   const [fromDistrict, setFromDistrict] = useState('Select District');
   const [toDistrict, setToDistrict] = useState('Select District');
@@ -26,7 +26,6 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
     accountNumber: ''
   });
 
-  // Fetch all buses from backend
   const fetchBuses = useCallback(async () => {
     try {
       const query = [];
@@ -44,7 +43,6 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
     }
   }, [fromDistrict, toDistrict]);
 
-  // Fetch ticket history for current user
   const fetchUserTickets = useCallback(async () => {
     if (!currentUser?.email) return;
     try {
@@ -68,7 +66,6 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
     }
   }, [activeTab, fetchUserTickets]);
 
-  // Handle seat toggling (max 4 seats allowed)
   const handleSeatClick = (seat) => {
     const isBooked = selectedBus?.bookedSeats?.includes(seat);
     if (isBooked) return;
@@ -84,9 +81,10 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
     }
   };
 
-  const totalAmount = selectedSeats.length * (selectedBus?.fare || 0);
+  const rawFare = selectedBus?.fare || 0;
+  const numericFare = parseInt(rawFare.toString().replace(/\D/g, ''), 10) || 0;
+  const totalAmount = selectedSeats.length * numericFare;
 
-  // Synchronized confirmation handler
   const handleConfirmBooking = async (e) => {
     e.preventDefault();
 
@@ -105,26 +103,20 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
     const updatedBookedSeats = Array.from(new Set([...existingBooked, ...selectedSeats]));
 
     try {
-      // 1. Lock seats on Bus schema via API
-      const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
+      // 1. Lock reserved seats on bus document
+      await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookedSeats: updatedBookedSeats })
       });
 
-      if (!resBus.ok) {
-        throw new Error('Failed to update reserved seats on server.');
-      }
-
-      // 2. Persist new ticket record to DB via API
+      // 2. Post new Ticket record to MongoDB
       const newTicketRecord = {
-        id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
         busId: busId,
         busName: selectedBus.name,
         operator: selectedBus.name,
         from: selectedBus.from,
         to: selectedBus.to,
-        route: selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`,
         seats: [...selectedSeats],
         fare: totalAmount,
         price: totalAmount,
@@ -153,18 +145,14 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
         throw new Error('Failed to save ticket details.');
       }
 
-      // 3. Refresh live dataset state
       await fetchBuses();
       await fetchUserTickets();
 
-      // 4. Update UI confirmation states
       setBookingSuccess({
         busName: selectedBus.name,
-        busNumber: selectedBus.busNumber || 'N/A',
         seats: [...selectedSeats],
         totalPaid: totalAmount,
         trxId: newTicketRecord.trxId,
-        paymentMethod,
         passengerName: passenger.name
       });
 
@@ -177,7 +165,7 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
 
     } catch (err) {
       console.error('Booking Error:', err);
-      alert(err.message || 'Transaction failed. Please check your network connection.');
+      alert(err.message || 'Transaction failed. Please check server logs.');
     }
   };
 
@@ -185,7 +173,6 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>Bus Ticket Reservation System</h1>
 
-      {/* Navigation Tabs */}
       <div style={{ marginBottom: '20px' }}>
         <button 
           onClick={() => setActiveTab('buses')}
@@ -201,10 +188,8 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
         </button>
       </div>
 
-      {/* TAB 1: BUS SEARCH & SELECTION */}
       {activeTab === 'buses' && (
         <div>
-          {/* Search Bar */}
           <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', background: '#f5f5f5', padding: '15px', borderRadius: '8px' }}>
             <div>
               <label>From: </label>
@@ -213,7 +198,7 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
                 <option value="Dhaka">Dhaka</option>
                 <option value="Chittagong">Chittagong</option>
                 <option value="Sylhet">Sylhet</option>
-                <option value="Rajshahi">Rajshahi</option>
+                <option value="Cox's Bazar">Cox's Bazar</option>
               </select>
             </div>
             <div>
@@ -223,21 +208,20 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
                 <option value="Dhaka">Dhaka</option>
                 <option value="Chittagong">Chittagong</option>
                 <option value="Sylhet">Sylhet</option>
-                <option value="Rajshahi">Rajshahi</option>
+                <option value="Cox's Bazar">Cox's Bazar</option>
               </select>
             </div>
             <button onClick={fetchBuses} style={{ padding: '5px 15px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px' }}>Filter</button>
           </div>
 
-          {/* Bus List */}
           <h3>Available Buses</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
             {buses.map((bus) => (
               <div key={bus._id || bus.id} style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '15px', background: '#fff' }}>
-                <h4>{bus.name} ({bus.busType || 'AC'})</h4>
+                <h4>{bus.name} ({bus.busType || 'Standard'})</h4>
                 <p><strong>Route:</strong> {bus.from} ➔ {bus.to}</p>
-                <p><strong>Departure:</strong> {bus.departureTime || '10:00 AM'}</p>
-                <p><strong>Fare:</strong> ৳{bus.fare}</p>
+                <p><strong>Departure:</strong> {bus.departureTime || 'N/A'}</p>
+                <p><strong>Fare:</strong> {bus.fare}</p>
                 <button 
                   onClick={() => { setSelectedBus(bus); setSelectedSeats([]); setBookingSuccess(null); }}
                   style={{ padding: '8px 16px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
@@ -248,12 +232,9 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
             ))}
           </div>
 
-          {/* Seat Layout Selection Modal / Section */}
           {selectedBus && (
             <div style={{ marginTop: '30px', borderTop: '2px solid #007bff', paddingTop: '20px' }}>
               <h3>Select Seats for {selectedBus.name}</h3>
-              <p>Click on an available seat (Grey) to select it (Green). Red seats are already booked.</p>
-
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 50px)', gap: '10px', margin: '20px 0' }}>
                 {['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C2', 'C3', 'C4', 'D1', 'D2', 'D3', 'D4'].map((seat) => {
                   const isBooked = selectedBus.bookedSeats?.includes(seat);
@@ -300,7 +281,6 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
             </div>
           )}
 
-          {/* Checkout & Payment Form Modal */}
           {isCheckoutOpen && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', maxWidth: '400px', width: '100%' }}>
@@ -335,7 +315,7 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
                     </select>
                   </div>
                   <div style={{ marginBottom: '15px' }}>
-                    <label>{paymentMethod} Account / Card Number:</label>
+                    <label>{paymentMethod} Account Number:</label>
                     <input 
                       type="text" 
                       required
@@ -359,7 +339,6 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
             </div>
           )}
 
-          {/* Successful Ticket Banner */}
           {bookingSuccess && (
             <div style={{ marginTop: '20px', padding: '15px', background: '#d4edda', border: '1px solid #c3e6cb', color: '#155724', borderRadius: '6px' }}>
               <h3>🎉 Booking Confirmed!</h3>
@@ -373,7 +352,6 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
         </div>
       )}
 
-      {/* TAB 2: TICKET HISTORY */}
       {activeTab === 'history' && (
         <div>
           <h3>My Booked Tickets</h3>

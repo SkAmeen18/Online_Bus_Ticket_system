@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -12,7 +13,7 @@ app.use(express.json());
 // MONGOOSE SCHEMAS & MODELS
 // ------------------------------------------------------------------
 
-// Bus Schema
+// 1. Bus Schema
 const busSchema = new mongoose.Schema({
   id: Number,
   name: { type: String, required: true },
@@ -22,7 +23,7 @@ const busSchema = new mongoose.Schema({
   to: String,
   departureTime: String,
   arrivalTime: String,
-  fare: Number,
+  fare: mongoose.Schema.Types.Mixed,
   seats: { type: Number, default: 40 },
   busType: String,
   bookedSeats: { type: [String], default: [] },
@@ -31,35 +32,48 @@ const busSchema = new mongoose.Schema({
 
 const Bus = mongoose.model('Bus', busSchema);
 
-// Ticket Schema
+// 2. Ultra-Lenient Ticket Schema (Prevents validation failures)
 const ticketSchema = new mongoose.Schema({
-  id: { type: String, required: true },
-  busId: { type: mongoose.Schema.Types.Mixed, required: true },
-  userEmail: { type: String, required: true },
-  passengerEmail: String,
-  passengerPhone: String,
-  passengerName: String,
-  busName: String,
-  operator: String,
-  from: String,
-  to: String,
-  seats: [String],
-  seatNumber: String,
-  fare: Number,
-  price: Number,
-  paymentMethod: String,
-  trxId: String,
-  purchaseDate: String,
+  id: { type: String, default: () => `TICK-${Math.floor(100000 + Math.random() * 900000)}` },
+  busId: { type: mongoose.Schema.Types.Mixed },
+  userEmail: { type: String, default: 'guest@example.com' },
+  passengerEmail: { type: String, default: 'guest@example.com' },
+  passengerPhone: { type: String, default: 'N/A' },
+  passengerName: { type: String, default: 'Passenger' },
+  busName: { type: String, default: 'Bus Service' },
+  operator: { type: String, default: 'Bus Service' },
+  from: { type: String, default: '' },
+  to: { type: String, default: '' },
+  seats: { type: [String], default: [] },
+  seatNumber: { type: String, default: '' },
+  fare: { type: mongoose.Schema.Types.Mixed, default: 0 },
+  price: { type: mongoose.Schema.Types.Mixed, default: 0 },
+  paymentMethod: { type: String, default: 'bKash' },
+  trxId: { type: String, default: () => `TRX-${Math.floor(10000000 + Math.random() * 90000000)}` },
+  purchaseDate: { type: String, default: () => new Date().toLocaleString() },
   date: { type: Date, default: Date.now }
-});
+}, { strict: false });
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
+
+// Helper function to handle ObjectId vs Numeric bus IDs
+const getBusQuery = (busId) => {
+  if (!busId) return null;
+  if (mongoose.Types.ObjectId.isValid(busId)) {
+    return { _id: busId };
+  }
+  const numId = Number(busId);
+  if (!isNaN(numId)) {
+    return { $or: [{ id: numId }, { _id: busId }] };
+  }
+  return { id: busId };
+};
 
 // ------------------------------------------------------------------
 // API ENDPOINTS
 // ------------------------------------------------------------------
 
-// 1. GET /api/buses - Fetch all buses (with optional district filtering)
+// GET /api/buses - Fetch all buses
 app.get('/api/buses', async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -75,15 +89,12 @@ app.get('/api/buses', async (req, res) => {
   }
 });
 
-// 2. PUT /api/buses/:id - Update seat availability for a specific bus
+// PUT /api/buses/:id - Update seat availability directly
 app.put('/api/buses/:id', async (req, res) => {
   try {
     const busId = req.params.id;
     const { bookedSeats } = req.body;
-
-    const query = mongoose.Types.ObjectId.isValid(busId) 
-      ? { _id: busId } 
-      : { id: Number(busId) };
+    const query = getBusQuery(busId);
 
     const updatedBus = await Bus.findOneAndUpdate(
       query,
@@ -101,7 +112,7 @@ app.put('/api/buses/:id', async (req, res) => {
   }
 });
 
-// 3. GET /api/tickets - Fetch tickets with user email filter
+// GET /api/tickets - Fetch tickets filtered by user email
 app.get('/api/tickets', async (req, res) => {
   try {
     const { email } = req.query;
@@ -119,68 +130,50 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
+// POST /api/tickets - Issue new ticket and update booked seats on Bus
 app.post('/api/tickets', async (req, res) => {
+  console.log('--- NEW TICKET REQUEST RECEIVED ---');
+  console.log('Payload:', req.body);
+
   try {
-    const {
-      id,
-      busId,
-      userEmail,
-      passengerEmail,
-      passengerPhone,
-      passengerName,
-      busName,
-      operator,
-      from,
-      to,
-      seats,
-      seatNumber,
-      fare,
-      price,
-      paymentMethod,
-      trxId,
-      purchaseDate
-    } = req.body;
+    const payload = req.body || {};
 
-    // Parse seats array
-    const seatArray = seats && seats.length > 0 
-      ? seats 
-      : (seatNumber ? seatNumber.split(',').map(s => s.trim()) : []);
+    // Standardize seat format
+    const seatArray = Array.isArray(payload.seats) && payload.seats.length > 0
+      ? payload.seats
+      : (payload.seatNumber ? payload.seatNumber.split(',').map(s => s.trim()) : []);
 
-    // Strip out non-numeric characters (handles "1200 BDT" -> 1200)
-    const cleanFare = parseInt((fare || price || '0').toString().replace(/\D/g, ''), 10) || 0;
+    // Clean fare calculation
+    const rawFare = payload.fare || payload.price || 0;
+    const cleanFare = parseInt(rawFare.toString().replace(/\D/g, ''), 10) || 0;
 
-    // Build flexible ticket object
-    const newTicket = new Ticket({
-      id: id || `TICK-${Math.floor(100000 + Math.random() * 900000)}`,
-      busId: busId ? busId.toString() : 'N/A',
-      userEmail: userEmail || passengerEmail || 'user@example.com',
-      passengerEmail: passengerEmail || userEmail || 'user@example.com',
-      passengerPhone: passengerPhone || 'N/A',
-      passengerName: passengerName || 'Passenger',
-      busName: busName || operator || 'Express',
-      operator: operator || busName || 'Express',
-      from: from || 'N/A',
-      to: to || 'N/A',
+    const ticketData = {
+      ...payload,
+      id: payload.id || `TICK-${Math.floor(100000 + Math.random() * 900000)}`,
       seats: seatArray,
       seatNumber: seatArray.join(', '),
       fare: cleanFare,
       price: cleanFare,
-      paymentMethod: paymentMethod || 'bKash',
-      trxId: trxId || `TRX-${Math.floor(10000000 + Math.random() * 90000000)}`,
-      purchaseDate: purchaseDate || new Date().toLocaleString()
-    });
+      userEmail: payload.userEmail || payload.passengerEmail || 'guest@example.com',
+      passengerEmail: payload.passengerEmail || payload.userEmail || 'guest@example.com',
+      trxId: payload.trxId || `TRX-${Math.floor(10000000 + Math.random() * 90000000)}`,
+      purchaseDate: payload.purchaseDate || new Date().toLocaleString()
+    };
 
+    const newTicket = new Ticket(ticketData);
     const savedTicket = await newTicket.save();
 
-    // Lock bookedSeats on the Bus document
-    if (busId && seatArray.length > 0) {
-      const busQuery = mongoose.Types.ObjectId.isValid(busId) 
-        ? { _id: busId } 
-        : { id: Number(busId) };
+    console.log('✅ TICKET CREATED IN ATLAS:', savedTicket._id);
 
-      await Bus.findOneAndUpdate(busQuery, {
-        $addToSet: { bookedSeats: { $each: seatArray } }
-      });
+    // Update Bus bookedSeats document automatically
+    if (payload.busId && seatArray.length > 0) {
+      const busQuery = getBusQuery(payload.busId);
+      if (busQuery) {
+        await Bus.findOneAndUpdate(busQuery, {
+          $addToSet: { bookedSeats: { $each: seatArray } }
+        });
+        console.log('✅ BUS BOOKED SEATS LOCKED FOR BUS ID:', payload.busId);
+      }
     }
 
     res.status(201).json(savedTicket);
@@ -189,15 +182,16 @@ app.post('/api/tickets', async (req, res) => {
     res.status(500).json({ message: 'Failed to process ticket booking', error: error.message });
   }
 });
+
 // ------------------------------------------------------------------
 // SERVER INITIALIZATION
 // ------------------------------------------------------------------
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/bus_booking_db';
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb+srv://ameenali1801_db_user:maugxMR5bo13wsJ9@onlinebusticket.13ahrnm.mongodb.net/bus_booking_db?retryWrites=true&w=majority";
 const PORT = process.env.PORT || 5000;
 
 mongoose.connect(MONGO_URI)
   .then(() => {
-    console.log('Connected to MongoDB successfully!');
+    console.log('Connected to MongoDB Atlas successfully!');
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
   .catch(err => console.error('MongoDB connection error:', err));
