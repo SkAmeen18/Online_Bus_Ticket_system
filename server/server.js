@@ -119,7 +119,6 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
-// 4. POST /api/tickets - Issue new ticket and update booked seats
 app.post('/api/tickets', async (req, res) => {
   try {
     const {
@@ -142,28 +141,30 @@ app.post('/api/tickets', async (req, res) => {
       purchaseDate
     } = req.body;
 
+    // Parse seats array
     const seatArray = seats && seats.length > 0 
       ? seats 
       : (seatNumber ? seatNumber.split(',').map(s => s.trim()) : []);
 
-    const numericFare = fare || price || 0;
+    // Strip out non-numeric characters (handles "1200 BDT" -> 1200)
+    const cleanFare = parseInt((fare || price || '0').toString().replace(/\D/g, ''), 10) || 0;
 
-    // Create new Ticket document
+    // Build flexible ticket object
     const newTicket = new Ticket({
       id: id || `TICK-${Math.floor(100000 + Math.random() * 900000)}`,
-      busId,
-      userEmail: userEmail || passengerEmail,
-      passengerEmail: passengerEmail || userEmail,
-      passengerPhone,
+      busId: busId ? busId.toString() : 'N/A',
+      userEmail: userEmail || passengerEmail || 'user@example.com',
+      passengerEmail: passengerEmail || userEmail || 'user@example.com',
+      passengerPhone: passengerPhone || 'N/A',
       passengerName: passengerName || 'Passenger',
-      busName: busName || operator,
-      operator: operator || busName,
-      from,
-      to,
+      busName: busName || operator || 'Express',
+      operator: operator || busName || 'Express',
+      from: from || 'N/A',
+      to: to || 'N/A',
       seats: seatArray,
       seatNumber: seatArray.join(', '),
-      fare: numericFare,
-      price: numericFare,
+      fare: cleanFare,
+      price: cleanFare,
       paymentMethod: paymentMethod || 'bKash',
       trxId: trxId || `TRX-${Math.floor(10000000 + Math.random() * 90000000)}`,
       purchaseDate: purchaseDate || new Date().toLocaleString()
@@ -171,7 +172,7 @@ app.post('/api/tickets', async (req, res) => {
 
     const savedTicket = await newTicket.save();
 
-    // Lock seats on corresponding Bus document automatically
+    // Lock bookedSeats on the Bus document
     if (busId && seatArray.length > 0) {
       const busQuery = mongoose.Types.ObjectId.isValid(busId) 
         ? { _id: busId } 
@@ -184,11 +185,10 @@ app.post('/api/tickets', async (req, res) => {
 
     res.status(201).json(savedTicket);
   } catch (error) {
-    console.error('Ticket booking error:', error);
+    console.error('❌ TICKET CREATION ERROR:', error);
     res.status(500).json({ message: 'Failed to process ticket booking', error: error.message });
   }
 });
-
 // ------------------------------------------------------------------
 // SERVER INITIALIZATION
 // ------------------------------------------------------------------
