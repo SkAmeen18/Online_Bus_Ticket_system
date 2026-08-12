@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
 
 const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } }) => {
   const [buses, setBuses] = useState([]);
@@ -103,14 +103,14 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
     const updatedBookedSeats = Array.from(new Set([...existingBooked, ...selectedSeats]));
 
     try {
-      // 1. Lock reserved seats on bus document
+      // 1. Lock reserved seats on bus document in MongoDB
       await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookedSeats: updatedBookedSeats })
       });
 
-      // 2. Post new Ticket record to MongoDB
+      // 2. Post new Ticket record directly to MongoDB Atlas
       const newTicketRecord = {
         busId: busId,
         busName: selectedBus.name,
@@ -124,6 +124,7 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
         passengerPhone: passenger.phone,
         passengerEmail: passenger.email || currentUser.email,
         userEmail: currentUser.email,
+        userPhone: passenger.phone,
         paymentMethod: paymentMethod,
         trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
         purchaseDate: new Date().toLocaleDateString('en-US', {
@@ -361,7 +362,7 @@ const User = ({ currentUser = { name: 'John Doe', email: 'user@example.com' } })
             <div style={{ display: 'grid', gap: '15px' }}>
               {tickets.map((ticket) => (
                 <div key={ticket._id || ticket.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '6px', background: '#fafafa' }}>
-                  <p><strong>Ticket ID:</strong> {ticket.id}</p>
+                  <p><strong>Ticket ID:</strong> {ticket._id || ticket.id}</p>
                   <p><strong>Operator:</strong> {ticket.busName || ticket.operator}</p>
                   <p><strong>Route:</strong> {ticket.from} ➔ {ticket.to}</p>
                   <p><strong>Seat(s):</strong> {Array.isArray(ticket.seats) ? ticket.seats.join(', ') : ticket.seatNumber}</p>
