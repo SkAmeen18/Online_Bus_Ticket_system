@@ -201,10 +201,10 @@ app.get('/api/buses', async (req, res) => {
     const { from, to } = req.query;
     let query = {};
 
-    if (from && from !== 'All Districts') {
+    if (from && from !== 'All Districts' && from !== 'Select District') {
       query.from = new RegExp(`^${from.trim()}$`, 'i');
     }
-    if (to && to !== 'All Districts') {
+    if (to && to !== 'All Districts' && to !== 'Select District') {
       query.to = new RegExp(`^${to.trim()}$`, 'i');
     }
 
@@ -289,6 +289,7 @@ app.post('/api/tickets', async (req, res) => {
     await newTicket.save();
     res.status(201).json(newTicket);
   } catch (error) {
+    console.error('Save ticket error:', error);
     res.status(500).json({ message: 'Failed to save ticket transaction' });
   }
 });
