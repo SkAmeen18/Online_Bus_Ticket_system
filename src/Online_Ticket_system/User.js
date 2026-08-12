@@ -375,7 +375,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
               <button 
                 style={styles.resetSearchBtn} 
-                onClick={() => { setSearchFrom('All Districts'); setSearchTo('All Districts'); }}
+                onClick={() => { setSearchFrom('Select District'); setSearchTo('Select District'); }}
               >
                 Show All Routes
               </button>
