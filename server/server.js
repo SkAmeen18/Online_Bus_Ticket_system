@@ -13,7 +13,7 @@ app.use(express.json());
 // MONGOOSE SCHEMAS & MODELS
 // ------------------------------------------------------------------
 
-// 1. User Schema (Restored for Passenger & Admin Sign In)
+// 1. User Schema (Passenger & Admin)
 const userSchema = new mongoose.Schema({
   name: { type: String, default: 'Passenger' },
   email: { type: String, required: true },
@@ -43,7 +43,7 @@ const busSchema = new mongoose.Schema({
 
 const Bus = mongoose.model('Bus', busSchema);
 
-// 3. Ticket Schema
+// 3. Ticket Schema (Lenient format to prevent validation errors)
 const ticketSchema = new mongoose.Schema({
   id: { type: String, default: () => `TICK-${Math.floor(100000 + Math.random() * 900000)}` },
   busId: { type: mongoose.Schema.Types.Mixed },
@@ -84,7 +84,7 @@ const getBusQuery = (busId) => {
 // AUTHENTICATION ENDPOINTS
 // ------------------------------------------------------------------
 
-// Login Handler (Handles login by Email or Mobile Number)
+// Login Handler (Supports Email / Mobile Number Sign In)
 const handleLogin = async (req, res) => {
   try {
     const { email, phone, identifier, password } = req.body;
@@ -106,7 +106,7 @@ const handleLogin = async (req, res) => {
       return res.status(401).json({ message: 'Invalid login credentials.' });
     }
 
-    // Direct password match (handles string comparison)
+    // Direct password match
     if (user.password !== password) {
       return res.status(401).json({ message: 'Invalid login credentials.' });
     }
@@ -127,9 +127,11 @@ const handleLogin = async (req, res) => {
   }
 };
 
-// Support multiple API route naming conventions used by frontend
-app.post('/api/users/login', handleLogin);
+// Registered routes to cover all frontend path variations
+app.post('/api/signin', handleLogin);
+app.post('/api/users/signin', handleLogin);
 app.post('/api/login', handleLogin);
+app.post('/api/users/login', handleLogin);
 app.post('/api/auth/login', handleLogin);
 
 // Signup Handler
@@ -254,6 +256,7 @@ app.post('/api/tickets', async (req, res) => {
     const newTicket = new Ticket(ticketData);
     const savedTicket = await newTicket.save();
 
+    // Lock bookedSeats on the corresponding Bus
     if (payload.busId && seatArray.length > 0) {
       const busQuery = getBusQuery(payload.busId);
       if (busQuery) {
