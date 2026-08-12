@@ -111,7 +111,8 @@ app.post('/api/signup', async (req, res) => {
         email: newUser.email,
         phone: newUser.phone,
         role: newUser.role,
-        joined: newUser.joined
+        joined: newUser.joined,
+        avatar: newUser.avatar
       }
     });
   } catch (error) {
@@ -161,21 +162,31 @@ app.post('/api/signin', async (req, res) => {
   }
 });
 
-// User Profile Update Route
+// User Profile Update & Password Change Route
 app.put('/api/users/profile', async (req, res) => {
   try {
-    const { email, name, phone, avatar } = req.body;
+    const { email, name, phone, avatar, newPassword } = req.body;
     if (!email) return res.status(400).json({ message: 'User email is required' });
+
+    const updateFields = { name, phone, avatar };
+
+    if (newPassword && newPassword.trim().length >= 6) {
+      updateFields.password = await bcrypt.hash(newPassword, 10);
+    }
 
     const updatedUser = await User.findOneAndUpdate(
       { email: email.trim().toLowerCase() },
-      { $set: { name, phone, avatar } },
+      { $set: updateFields },
       { new: true, select: '-password' }
     );
 
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User profile not found.' });
+    }
+
     res.status(200).json(updatedUser);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update user profile' });
+    res.status(500).json({ message: 'Failed to update user profile', error: error.message });
   }
 });
 
@@ -201,10 +212,10 @@ app.get('/api/buses', async (req, res) => {
     const { from, to } = req.query;
     let query = {};
 
-    if (from && from !== 'All Districts') {
+    if (from && from !== 'Select District' && from !== 'All Districts') {
       query.from = new RegExp(`^${from.trim()}$`, 'i');
     }
-    if (to && to !== 'All Districts') {
+    if (to && to !== 'Select District' && to !== 'All Districts') {
       query.to = new RegExp(`^${to.trim()}$`, 'i');
     }
 
