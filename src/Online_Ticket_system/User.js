@@ -121,21 +121,40 @@ export default function User({ activeTab = 'Home', user = {} }) {
     }
   }, [searchFrom, searchTo]);
 
-  // Fetch User's Ticket History from MongoDB
+  // Fetch User's Ticket History from MongoDB + LocalStorage Fallback
   const fetchUserTickets = useCallback(async () => {
-    const userEmail = currentUserData.email;
+    const userEmail = currentUserData.email || user?.emailOrPhone || user?.email;
     if (!userEmail) return;
+
+    // Load local storage fallback tickets first
+    const storageKey = `user_tickets_${userEmail.toLowerCase().trim()}`;
+    const localTicketsRaw = localStorage.getItem(storageKey);
+    let localTickets = localTicketsRaw ? JSON.parse(localTicketsRaw) : [];
 
     try {
       const res = await fetch(`${API_BASE}/tickets?email=${encodeURIComponent(userEmail)}`);
       if (res.ok) {
-        const tickets = await res.json();
-        setUserPaymentHistory(Array.isArray(tickets) ? tickets : []);
+        const apiTickets = await res.json();
+        if (Array.isArray(apiTickets) && apiTickets.length > 0) {
+          // Merge API and local storage tickets without duplicates
+          const combined = [...apiTickets];
+          localTickets.forEach((l) => {
+            if (!combined.some((a) => a.trxId === l.trxId || a.id === l.id)) {
+              combined.push(l);
+            }
+          });
+          setUserPaymentHistory(combined);
+          localStorage.setItem(storageKey, JSON.stringify(combined));
+          return;
+        }
       }
     } catch (err) {
-      console.error('Error fetching ticket history:', err);
+      console.error('Error fetching ticket history from server:', err);
     }
-  }, [currentUserData.email]);
+
+    // Fallback to locally persisted tickets if backend response is empty or offline
+    setUserPaymentHistory(localTickets);
+  }, [currentUserData.email, user]);
 
   useEffect(() => {
     fetchBuses();
@@ -169,10 +188,10 @@ export default function User({ activeTab = 'Home', user = {} }) {
   }, [user]);
 
   useEffect(() => {
-    if (currentUserData.email) {
+    if (currentUserData.email || user?.emailOrPhone || user?.email) {
       fetchUserTickets();
     }
-  }, [currentUserData.email, fetchUserTickets]);
+  }, [currentUserData.email, user, fetchUserTickets]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -292,74 +311,78 @@ export default function User({ activeTab = 'Home', user = {} }) {
     const busId = selectedBus._id || selectedBus.id;
     const existingBooked = selectedBus.bookedSeats || [];
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
+    const userAccountKey = (currentUserData.email || user?.emailOrPhone || user?.email || 'guest').toLowerCase().trim();
+
+    const newTicketRecord = {
+      id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
+      busId: busId,
+      busName: selectedBus.name,
+      from: selectedBus.from,
+      to: selectedBus.to,
+      route: selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`,
+      seats: [...selectedSeats],
+      fare: totalAmount,
+      passengerName: passenger.name,
+      passengerPhone: passenger.phone,
+      passengerEmail: passenger.email || currentUserData.email,
+      userEmail: userAccountKey,
+      paymentMethod: paymentMethod,
+      trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
+      purchaseDate: new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+
+    // 1. Permanently Save to Local Storage immediately
+    const storageKey = `user_tickets_${userAccountKey}`;
+    const existingLocalRaw = localStorage.getItem(storageKey);
+    const existingLocal = existingLocalRaw ? JSON.parse(existingLocalRaw) : [];
+    const updatedLocalTickets = [newTicketRecord, ...existingLocal];
+    localStorage.setItem(storageKey, JSON.stringify(updatedLocalTickets));
+    setUserPaymentHistory(updatedLocalTickets);
 
     try {
-      // 1. Reserve seats in MongoDB Atlas
-      const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
+      // 2. Reserve seats in MongoDB Atlas
+      await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookedSeats: updatedBookedSeats })
       });
 
-      if (!resBus.ok) {
-        throw new Error('Failed to update reserved seats on server.');
-      }
-
-      // 2. Save ticket in MongoDB Atlas
-      const newTicketRecord = {
-        id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
-        busId: busId,
-        busName: selectedBus.name,
-        from: selectedBus.from,
-        to: selectedBus.to,
-        route: selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`,
-        seats: [...selectedSeats],
-        fare: totalAmount,
-        passengerName: passenger.name,
-        passengerPhone: passenger.phone,
-        passengerEmail: passenger.email || currentUserData.email,
-        userEmail: currentUserData.email,
-        paymentMethod: paymentMethod,
-        trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
-        purchaseDate: new Date().toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      };
-
+      // 3. Save ticket to database API
       await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTicketRecord)
       });
 
-      // 3. Refresh Data
+      // 4. Refresh Data
       fetchBuses();
       fetchUserTickets();
-
-      setBookingSuccess({
-        busName: selectedBus.name,
-        busNumber: selectedBus.busNumber,
-        seats: [...selectedSeats],
-        totalPaid: totalAmount,
-        trxId: newTicketRecord.trxId,
-        paymentMethod,
-        passengerName: passenger.name
-      });
-
-      setIsCheckoutOpen(false);
-      setSelectedSeats([]);
-      setSelectedBus((prev) => ({
-        ...prev,
-        bookedSeats: updatedBookedSeats
-      }));
-
     } catch (err) {
-      alert('Transaction failed. Please check internet connection.');
+      console.warn('Backend offline, ticket stored locally.');
     }
+
+    setBookingSuccess({
+      busName: selectedBus.name,
+      busNumber: selectedBus.busNumber,
+      seats: [...selectedSeats],
+      totalPaid: totalAmount,
+      trxId: newTicketRecord.trxId,
+      paymentMethod,
+      passengerName: passenger.name
+    });
+
+    setIsCheckoutOpen(false);
+    setSelectedSeats([]);
+    setSelectedBus((prev) => ({
+      ...prev,
+      bookedSeats: updatedBookedSeats
+    }));
   };
 
   const currentTab = (activeTab || 'Home').toLowerCase();
@@ -541,13 +564,13 @@ export default function User({ activeTab = 'Home', user = {} }) {
       )}
 
       {/* 3. TICKETS / HISTORY TAB */}
-      {(currentTab === 'tickets' || currentTab === 'history') && (
+      {(currentTab === 'tickets' || currentTab === 'history' || currentTab === 'payment') && (
         <div style={styles.contentSection}>
           <div style={styles.sectionHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Receipt size={24} color="#38bdf8" />
               <div>
-                <h3 style={styles.sectionTitle}>My Ticket History</h3>
+                <h3 style={styles.sectionTitle}>My Ticket & Payment History</h3>
                 <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>All purchased bus tickets and transaction logs</span>
               </div>
             </div>
