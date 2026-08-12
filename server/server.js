@@ -13,7 +13,18 @@ app.use(express.json());
 // MONGOOSE SCHEMAS & MODELS
 // ------------------------------------------------------------------
 
-// 1. Bus Schema
+// 1. User Schema (Restored for Passenger & Admin Sign In)
+const userSchema = new mongoose.Schema({
+  name: { type: String, default: 'Passenger' },
+  email: { type: String, required: true },
+  phone: { type: String },
+  password: { type: String, required: true },
+  role: { type: String, default: 'passenger' }
+}, { strict: false });
+
+const User = mongoose.model('User', userSchema);
+
+// 2. Bus Schema
 const busSchema = new mongoose.Schema({
   id: Number,
   name: { type: String, required: true },
@@ -32,7 +43,7 @@ const busSchema = new mongoose.Schema({
 
 const Bus = mongoose.model('Bus', busSchema);
 
-// 2. Ultra-Lenient Ticket Schema (Prevents validation failures)
+// 3. Ticket Schema
 const ticketSchema = new mongoose.Schema({
   id: { type: String, default: () => `TICK-${Math.floor(100000 + Math.random() * 900000)}` },
   busId: { type: mongoose.Schema.Types.Mixed },
@@ -56,7 +67,7 @@ const ticketSchema = new mongoose.Schema({
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
 
-// Helper function to handle ObjectId vs Numeric bus IDs
+// Helper function to query bus by ObjectId or Numeric ID
 const getBusQuery = (busId) => {
   if (!busId) return null;
   if (mongoose.Types.ObjectId.isValid(busId)) {
@@ -70,10 +81,95 @@ const getBusQuery = (busId) => {
 };
 
 // ------------------------------------------------------------------
-// API ENDPOINTS
+// AUTHENTICATION ENDPOINTS
 // ------------------------------------------------------------------
 
-// GET /api/buses - Fetch all buses
+// Login Handler (Handles login by Email or Mobile Number)
+const handleLogin = async (req, res) => {
+  try {
+    const { email, phone, identifier, password } = req.body;
+    const loginInput = (email || identifier || phone || '').toString().trim().toLowerCase();
+
+    if (!loginInput || !password) {
+      return res.status(400).json({ message: 'Email/Mobile and password are required.' });
+    }
+
+    // Find user by email or phone
+    const user = await User.findOne({
+      $or: [
+        { email: new RegExp(`^${loginInput}$`, 'i') },
+        { phone: loginInput }
+      ]
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid login credentials.' });
+    }
+
+    // Direct password match (handles string comparison)
+    if (user.password !== password) {
+      return res.status(401).json({ message: 'Invalid login credentials.' });
+    }
+
+    return res.json({
+      message: 'Sign in successful',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role || 'passenger'
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({ message: 'Server error during sign in', error: error.message });
+  }
+};
+
+// Support multiple API route naming conventions used by frontend
+app.post('/api/users/login', handleLogin);
+app.post('/api/login', handleLogin);
+app.post('/api/auth/login', handleLogin);
+
+// Signup Handler
+const handleSignup = async (req, res) => {
+  try {
+    const { name, email, phone, password, role } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User with this email already exists.' });
+    }
+
+    const newUser = new User({
+      name: name || 'Passenger',
+      email: email.toLowerCase(),
+      phone: phone || '',
+      password: password,
+      role: role || 'passenger'
+    });
+
+    await newUser.save();
+    return res.status(201).json({ message: 'User registered successfully', user: newUser });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error creating user', error: error.message });
+  }
+};
+
+app.post('/api/users/register', handleSignup);
+app.post('/api/register', handleSignup);
+app.post('/api/signup', handleSignup);
+
+// ------------------------------------------------------------------
+// BUS & TICKET ENDPOINTS
+// ------------------------------------------------------------------
+
+// GET /api/buses
 app.get('/api/buses', async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -89,7 +185,7 @@ app.get('/api/buses', async (req, res) => {
   }
 });
 
-// PUT /api/buses/:id - Update seat availability directly
+// PUT /api/buses/:id
 app.put('/api/buses/:id', async (req, res) => {
   try {
     const busId = req.params.id;
@@ -112,7 +208,7 @@ app.put('/api/buses/:id', async (req, res) => {
   }
 });
 
-// GET /api/tickets - Fetch tickets filtered by user email
+// GET /api/tickets
 app.get('/api/tickets', async (req, res) => {
   try {
     const { email } = req.query;
@@ -130,20 +226,15 @@ app.get('/api/tickets', async (req, res) => {
   }
 });
 
-// POST /api/tickets - Issue new ticket and update booked seats on Bus
+// POST /api/tickets
 app.post('/api/tickets', async (req, res) => {
-  console.log('--- NEW TICKET REQUEST RECEIVED ---');
-  console.log('Payload:', req.body);
-
   try {
     const payload = req.body || {};
 
-    // Standardize seat format
     const seatArray = Array.isArray(payload.seats) && payload.seats.length > 0
       ? payload.seats
       : (payload.seatNumber ? payload.seatNumber.split(',').map(s => s.trim()) : []);
 
-    // Clean fare calculation
     const rawFare = payload.fare || payload.price || 0;
     const cleanFare = parseInt(rawFare.toString().replace(/\D/g, ''), 10) || 0;
 
@@ -163,16 +254,12 @@ app.post('/api/tickets', async (req, res) => {
     const newTicket = new Ticket(ticketData);
     const savedTicket = await newTicket.save();
 
-    console.log('✅ TICKET CREATED IN ATLAS:', savedTicket._id);
-
-    // Update Bus bookedSeats document automatically
     if (payload.busId && seatArray.length > 0) {
       const busQuery = getBusQuery(payload.busId);
       if (busQuery) {
         await Bus.findOneAndUpdate(busQuery, {
           $addToSet: { bookedSeats: { $each: seatArray } }
         });
-        console.log('✅ BUS BOOKED SEATS LOCKED FOR BUS ID:', payload.busId);
       }
     }
 
