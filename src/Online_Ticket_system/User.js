@@ -101,8 +101,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
     try {
       setLoadingBuses(true);
       let queryParams = [];
-      if (searchFrom !== 'All Districts') queryParams.push(`from=${encodeURIComponent(searchFrom)}`);
-      if (searchTo !== 'All Districts') queryParams.push(`to=${encodeURIComponent(searchTo)}`);
+      if (searchFrom !== 'Select District') queryParams.push(`from=${encodeURIComponent(searchFrom)}`);
+      if (searchTo !== 'Select District') queryParams.push(`to=${encodeURIComponent(searchTo)}`);
       
       const queryString = queryParams.length ? `?${queryParams.join('&')}` : '';
       const res = await fetch(`${API_BASE}/buses${queryString}`);
