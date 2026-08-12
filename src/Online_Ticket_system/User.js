@@ -348,7 +348,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
             <div style={styles.searchRow}>
               <div style={styles.searchField}>
-                <label style={styles.searchLabel}><MapPin size={14} color="#a1a1aa" /> From District</label>
+                <label style={styles.searchLabel}><MapPin size={14} color="#dadae0" /> From District</label>
                 <select 
                   value={searchFrom} 
                   onChange={(e) => setSearchFrom(e.target.value)}
@@ -361,7 +361,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
               </div>
 
               <div style={styles.searchField}>
-                <label style={styles.searchLabel}><MapPin size={14} color="#a1a1aa" /> To District</label>
+                <label style={styles.searchLabel}><MapPin size={14} color="#dadae0" /> To District</label>
                 <select 
                   value={searchTo} 
                   onChange={(e) => setSearchTo(e.target.value)}
