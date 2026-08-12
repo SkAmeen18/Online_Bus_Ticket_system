@@ -60,8 +60,8 @@ const formatTimeWithAmPm = (timeStr) => {
 export default function User({ activeTab = 'Home', user = {} }) {
   const [buses, setBuses] = useState([]);
   const [loadingBuses, setLoadingBuses] = useState(true);
-  const [searchFrom, setSearchFrom] = useState('All Districts');
-  const [searchTo, setSearchTo] = useState('All Districts');
+  const [searchFrom, setSearchFrom] = useState('Select District');
+  const [searchTo, setSearchTo] = useState('Select District');
   
   const [selectedBus, setSelectedBus] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
