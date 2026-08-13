@@ -269,6 +269,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
   };
 
   // UPDATED METHOD WITH FULL HEADERS AND AUTHENTICATION
+  // UPDATED METHOD WITH FULL API CALLS & ERROR HANDLING
   const handleConfirmBooking = async (e) => {
     e.preventDefault();
 
@@ -283,13 +284,12 @@ export default function User({ activeTab = 'Home', user = {} }) {
     }
 
     const token = localStorage.getItem('token');
-    
     const busId = selectedBus._id || selectedBus.id;
     const existingBooked = selectedBus.bookedSeats || [];
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
 
     try {
-      // 1. Updates the bus document on MongoDB
+      // 1. UPDATE BUS SEATS IN MONGODB
       const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: { 
@@ -303,7 +303,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         throw new Error('Failed to update reserved seats on MongoDB server.');
       }
 
-      // 2. Creates a permanent ticket entry in MongoDB
+      // 2. CREATE TICKET RECORD IN MONGODB
       const newTicketRecord = {
         busId: busId,
         busName: selectedBus.name,
@@ -336,36 +336,39 @@ export default function User({ activeTab = 'Home', user = {} }) {
         body: JSON.stringify(newTicketRecord)
       });
 
-      if (resTicket.ok) {
-        fetchBuses();
-        fetchUserTickets();
-
-        setBookingSuccess({
-          busName: selectedBus.name,
-          busNumber: selectedBus.busNumber,
-          seats: [...selectedSeats],
-          totalPaid: totalAmount,
-          trxId: newTicketRecord.trxId,
-          paymentMethod,
-          passengerName: passenger.name
-        });
-
-        setIsCheckoutOpen(false);
-        setSelectedSeats([]);
-        setSelectedBus((prev) => ({
-          ...prev,
-          bookedSeats: updatedBookedSeats
-        }));
-      } else {
-        alert('Could not save booking details to MongoDB database.');
+      if (!resTicket.ok) {
+        throw new Error('Could not save booking details to MongoDB database.');
       }
 
+      const savedTicket = await resTicket.json();
+      console.log('Ticket Saved to MongoDB successfully:', savedTicket);
+
+      // 3. REFRESH STATE & SHOW SUCCESS
+      fetchBuses();
+      fetchUserTickets();
+
+      setBookingSuccess({
+        busName: selectedBus.name,
+        busNumber: selectedBus.busNumber,
+        seats: [...selectedSeats],
+        totalPaid: totalAmount,
+        trxId: newTicketRecord.trxId,
+        paymentMethod,
+        passengerName: passenger.name
+      });
+
+      setIsCheckoutOpen(false);
+      setSelectedSeats([]);
+      setSelectedBus((prev) => ({
+        ...prev,
+        bookedSeats: updatedBookedSeats
+      }));
+
     } catch (err) {
-      console.error('Booking failed:', err);
-      alert('Transaction failed. Please check connection to database.');
+      console.error('Booking Error:', err);
+      alert(err.message || 'Transaction failed. Please check connection to database.');
     }
   };
-
   const currentTab = (activeTab || 'Home').toLowerCase();
 
   return (
