@@ -288,7 +288,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
 
     try {
-      // 1. UPDATE BUS SEATS IN MONGODB
       const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: {
@@ -302,7 +301,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
         throw new Error('Failed to update reserved seats on MongoDB server.');
       }
 
-      // 2. CREATE TICKET RECORD IN MONGODB
       const newTicketRecord = {
         busId: busId,
         busName: selectedBus.name,
@@ -339,10 +337,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
         throw new Error('Could not save booking details to MongoDB database.');
       }
 
-      const savedTicket = await resTicket.json();
-      console.log('Ticket Saved to MongoDB successfully:', savedTicket);
+      await resTicket.json();
 
-      // 3. REFRESH STATE & SHOW SUCCESS
       fetchBuses();
       fetchUserTickets();
 
@@ -372,6 +368,23 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
   return (
     <div style={styles.container}>
+      {/* Dynamic Scrollbar Injection */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #18181b;
+          border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #3f3f46;
+          border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #52525b;
+        }
+      `}</style>
 
       {/* 1. HOME TAB */}
       {(currentTab === 'home') && (
@@ -825,7 +838,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                       <span>⭕</span>
                     </div>
 
-                    <div style={styles.verticalSeatContainer}>
+                    <div style={styles.verticalSeatContainer} className="custom-scrollbar">
                       {Array.from({ length: Math.ceil((selectedBus.seats || 36) / 4) }).map((_, rowIndex) => {
                         const rowLetter = String.fromCharCode(65 + rowIndex);
                         const seat1 = `${rowLetter}1`;
@@ -838,7 +851,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                         return (
                           <div key={rowLetter} style={styles.busRowGroup}>
-                            <div style={{ display: 'flex', gap: '6px' }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
                               {[seat1, seat2].map((sId) => (
                                 <button
                                   key={sId}
@@ -858,7 +871,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                             <div style={{ flex: 1 }} />
 
-                            <div style={{ display: 'flex', gap: '6px' }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
                               {[seat3, seat4].map((sId) => (
                                 <button
                                   key={sId}
@@ -883,7 +896,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 </div>
 
                 <div style={styles.rightInfoColumn}>
-                  {/* --- BUS IMAGE GALLERY --- */}
+                  {/* BUS IMAGE GALLERY */}
                   {selectedBus.images && selectedBus.images.length > 0 ? (
                     <div style={styles.galleryWrapper}>
                       <img 
@@ -1114,14 +1127,22 @@ const styles = {
   modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' },
   closeBtn: { background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer' },
-  modalTwoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' },
+  modalTwoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', alignItems: 'start' },
   leftSeatColumn: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46' },
   seatHeaderFlex: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
   legendRow: { display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#a1a1aa' },
   legendBox: { width: '10px', height: '10px', borderRadius: '2px', display: 'inline-block' },
-  busChassis: { border: '2px solid #3f3f46', borderRadius: '16px', padding: '12px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', gap: '12px' },
-  driverCabinRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px' },
-  verticalSeatContainer: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' },
+  busChassis: { border: '2px solid #3f3f46', borderRadius: '16px', padding: '14px 8px 14px 14px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', gap: '12px' },
+  driverCabinRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px', paddingRight: '12px' },
+  verticalSeatContainer: { 
+    display: 'flex', 
+    flexDirection: 'column', 
+    gap: '10px', 
+    maxHeight: '380px', 
+    overflowY: 'auto', 
+    paddingRight: '12px',
+    boxSizing: 'border-box'
+  },
   busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   compactSeat: {
     width: '40px',
