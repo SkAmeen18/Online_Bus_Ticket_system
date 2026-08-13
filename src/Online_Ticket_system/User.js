@@ -1045,7 +1045,7 @@ const styles = {
   fontWeight: '700', 
   fontSize: '0.82rem', 
   cursor: 'pointer', 
-  marginTop: '10px' // <-- Change from '4px' to '10px' or '12px'
+  marginTop: '12px'
 },
   contentSection: { display: 'flex', flexDirection: 'column', gap: '20px' },
   aboutHeader: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', gap: '16px' },
