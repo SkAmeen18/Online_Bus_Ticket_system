@@ -883,6 +883,38 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 </div>
 
                 <div style={styles.rightInfoColumn}>
+                  {/* --- BUS IMAGE GALLERY --- */}
+                  {selectedBus.images && selectedBus.images.length > 0 ? (
+                    <div style={styles.galleryWrapper}>
+                      <img 
+                        src={selectedBus.images[activeImageIndex] || selectedBus.images[0]} 
+                        alt={`${selectedBus.name} Bus`} 
+                        style={styles.mainBusImage} 
+                      />
+                      {selectedBus.images.length > 1 && (
+                        <div style={styles.thumbnailRow}>
+                          {selectedBus.images.map((imgUrl, idx) => (
+                            <img
+                              key={idx}
+                              src={imgUrl}
+                              alt={`Bus view ${idx + 1}`}
+                              onClick={() => setActiveImageIndex(idx)}
+                              style={{
+                                ...styles.thumbnail,
+                                borderColor: activeImageIndex === idx ? '#38bdf8' : '#3f3f46'
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={styles.noImagePlaceholder}>
+                      <Bus size={36} color="#71717a" />
+                      <span>No bus images available</span>
+                    </div>
+                  )}
+
                   <div style={styles.detailCard}>
                     <span style={styles.detailLabel}>Coach & Class</span>
                     <span style={styles.detailValue}>{selectedBus.busType || 'Executive Class'}</span>
@@ -1121,5 +1153,47 @@ const styles = {
   gatewayBtn: { padding: '10px', borderRadius: '8px', border: '1px solid #3f3f46', color: '#f4f4f5', fontWeight: '700', cursor: 'pointer', fontSize: '0.85rem' },
   successReceiptCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px' },
   receiptDetailsBox: { backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px', padding: '16px', width: '100%', margin: '16px 0', display: 'flex', flexDirection: 'column', gap: '8px' },
-  receiptRow: { display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#a1a1aa' }
+  receiptRow: { display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#a1a1aa' },
+  galleryWrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    backgroundColor: '#18181b',
+    padding: '8px',
+    borderRadius: '10px',
+    border: '1px solid #3f3f46'
+  },
+  mainBusImage: {
+    width: '100%',
+    height: '140px',
+    objectFit: 'cover',
+    borderRadius: '8px'
+  },
+  thumbnailRow: {
+    display: 'flex',
+    gap: '6px',
+    overflowX: 'auto',
+    paddingBottom: '2px'
+  },
+  thumbnail: {
+    width: '45px',
+    height: '35px',
+    objectFit: 'cover',
+    borderRadius: '4px',
+    border: '2px solid #3f3f46',
+    cursor: 'pointer'
+  },
+  noImagePlaceholder: {
+    backgroundColor: '#18181b',
+    border: '1px solid #3f3f46',
+    borderRadius: '10px',
+    height: '120px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#71717a',
+    gap: '6px',
+    fontSize: '0.8rem'
+  }
 };
