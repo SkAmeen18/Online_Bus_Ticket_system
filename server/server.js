@@ -162,13 +162,17 @@ app.post('/api/signin', async (req, res) => {
   }
 });
 
-// User Profile Update & Password Change Route
+// User Profile Update & Password Change Route (FIXED PARTIAL UPDATES)
 app.put('/api/users/profile', async (req, res) => {
   try {
     const { email, name, phone, avatar, newPassword } = req.body;
     if (!email) return res.status(400).json({ message: 'User email is required' });
 
-    const updateFields = { name, phone, avatar };
+    // Only set fields that are explicitly provided in req.body
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name;
+    if (phone !== undefined) updateFields.phone = phone;
+    if (avatar !== undefined) updateFields.avatar = avatar;
 
     if (newPassword && newPassword.trim().length >= 6) {
       updateFields.password = await bcrypt.hash(newPassword, 10);
@@ -177,7 +181,7 @@ app.put('/api/users/profile', async (req, res) => {
     const updatedUser = await User.findOneAndUpdate(
       { email: email.trim().toLowerCase() },
       { $set: updateFields },
-      { new: true, select: '-password' }
+      { new: true, runValidators: true, select: '-password' }
     );
 
     if (!updatedUser) {
@@ -186,6 +190,7 @@ app.put('/api/users/profile', async (req, res) => {
 
     res.status(200).json(updatedUser);
   } catch (error) {
+    console.error('Profile update error:', error);
     res.status(500).json({ message: 'Failed to update user profile', error: error.message });
   }
 });
@@ -241,24 +246,30 @@ app.post('/api/buses', async (req, res) => {
   }
 });
 
-// Update Bus / Reserve Seats Route
+// COMBINED & FIXED: Single Update Bus / Reserve Seats Route
 app.put('/api/buses/:id', async (req, res) => {
   try {
     const { id } = req.params;
     let updatedBus;
     
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      updatedBus = await Bus.findByIdAndUpdate(id, { $set: req.body }, { new: true });
-    } else {
-      updatedBus = await Bus.findOneAndUpdate({ id: Number(id) }, { $set: req.body }, { new: true });
-    }
+    // Checks if the id parameter is a valid MongoDB ObjectId or custom Number id
+    const filter = mongoose.Types.ObjectId.isValid(id)
+      ? { _id: id }
+      : { id: Number(id) };
+
+    updatedBus = await Bus.findOneAndUpdate(
+      filter,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
 
     if (!updatedBus) {
       return res.status(404).json({ message: 'Bus route not found' });
     }
     res.status(200).json(updatedBus);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update bus seat layout' });
+    console.error('Bus update error:', error);
+    res.status(500).json({ message: 'Failed to update bus details/seats', error: error.message });
   }
 });
 
@@ -276,7 +287,7 @@ app.delete('/api/buses/:id', async (req, res) => {
   }
 });
 
-// 1. Save new ticket booking to MongoDB
+// Save new ticket booking to MongoDB
 app.post('/api/tickets', async (req, res) => {
   try {
     const newTicket = new Ticket(req.body);
@@ -287,27 +298,13 @@ app.post('/api/tickets', async (req, res) => {
   }
 });
 
-// 2. Fetch all ticket bookings (for Admin / User History)
+// Fetch all ticket bookings (for Admin / User History)
 app.get('/api/tickets', async (req, res) => {
   try {
     const { email } = req.query;
     const query = email ? { passengerEmail: email } : {};
     const tickets = await Ticket.find(query);
     res.json(tickets);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 3. Update bus bookedSeats array in MongoDB Atlas
-app.put('/api/buses/:id', async (req, res) => {
-  try {
-    const updatedBus = await Bus.findByIdAndUpdate(
-      req.params.id,
-      { bookedSeats: req.body.bookedSeats },
-      { new: true }
-    );
-    res.json(updatedBus);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
