@@ -1023,14 +1023,14 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
             <div style={styles.modalTwoColumn}>
               <div style={styles.leftSeatColumn}>
-                
+
                 {/* Header Section */}
                 <div style={styles.headerStyle}>
                   <div style={styles.titleRowStyle}>
                     <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1rem', fontWeight: '600' }}>
                       Seat Plan ({selectedBusDetails.seats} Seats)
                     </h3>
-                    
+
                     {/* Legend */}
                     <div style={styles.legendContainerStyle}>
                       <div style={styles.legendItemStyle}>
@@ -1595,7 +1595,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column'
   },
-  
+
   /* Layout Styles */
   headerStyle: {
     display: 'flex',
@@ -1675,15 +1675,19 @@ const styles = {
     width: '40px',
     height: '38px',
     borderRadius: '8px',
-    display: 'grid',         
+
+    display: 'grid',
     placeItems: 'center',
-    justify: 'center',
-    alignItems: 'center',
+    placeContent: 'center',
     textAlign: 'center',
+
+    appearance: 'none',
+    WebkitAppearance: 'none',
     padding: 0,
     margin: 0,
     border: 'none',
-    lineHeight: '1',
+    lineHeight: 1,
+
     color: '#ffffff',
     fontSize: '0.8rem',
     fontWeight: '700',
