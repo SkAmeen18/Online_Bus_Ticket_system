@@ -6,7 +6,13 @@ require('dotenv').config();
 
 const app = express();
 
-app.use(cors());
+// --- CORS & Body Parsing Middleware ---
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json({ limit: '10mb' }));
 
 // --- 1. Connect MongoDB Database ---
@@ -162,13 +168,12 @@ app.post('/api/signin', async (req, res) => {
   }
 });
 
-// User Profile Update & Password Change Route (FIXED PARTIAL UPDATES)
+// User Profile Update & Password Change Route
 app.put('/api/users/profile', async (req, res) => {
   try {
     const { email, name, phone, avatar, newPassword } = req.body;
     if (!email) return res.status(400).json({ message: 'User email is required' });
 
-    // Only set fields that are explicitly provided in req.body
     const updateFields = {};
     if (name !== undefined) updateFields.name = name;
     if (phone !== undefined) updateFields.phone = phone;
@@ -246,18 +251,16 @@ app.post('/api/buses', async (req, res) => {
   }
 });
 
-// COMBINED & FIXED: Single Update Bus / Reserve Seats Route
+// Update Bus / Reserve Seats Route
 app.put('/api/buses/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    let updatedBus;
     
-    // Checks if the id parameter is a valid MongoDB ObjectId or custom Number id
     const filter = mongoose.Types.ObjectId.isValid(id)
       ? { _id: id }
       : { id: Number(id) };
 
-    updatedBus = await Bus.findOneAndUpdate(
+    const updatedBus = await Bus.findOneAndUpdate(
       filter,
       { $set: req.body },
       { new: true, runValidators: true }
@@ -298,19 +301,28 @@ app.post('/api/tickets', async (req, res) => {
   }
 });
 
-// Fetch all ticket bookings (for Admin / User History)
+// Fetch all ticket bookings (Query by userEmail or passengerEmail)
 app.get('/api/tickets', async (req, res) => {
   try {
     const { email } = req.query;
-    const query = email ? { passengerEmail: email } : {};
-    const tickets = await Ticket.find(query);
-    res.json(tickets);
+    let query = {};
+    if (email) {
+      const cleanEmail = email.trim().toLowerCase();
+      query = {
+        $or: [
+          { userEmail: new RegExp(`^${cleanEmail}$`, 'i') },
+          { passengerEmail: new RegExp(`^${cleanEmail}$`, 'i') }
+        ]
+      };
+    }
+    const tickets = await Ticket.find(query).sort({ createdAt: -1 });
+    res.status(200).json(tickets);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
