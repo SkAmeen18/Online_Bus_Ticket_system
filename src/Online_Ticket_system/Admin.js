@@ -1675,7 +1675,7 @@ const styles = {
     width: '40px',
     height: '38px',
     borderRadius: '8px',
-    isplay: 'grid',         
+    display: 'grid',         
     placeItems: 'center',
     justify: 'center',
     alignItems: 'center',
