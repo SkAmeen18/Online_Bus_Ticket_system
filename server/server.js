@@ -251,24 +251,40 @@ app.post('/api/buses', async (req, res) => {
   }
 });
 
-// Update Bus / Reserve Seats Route
+// --- UPDATED: Update Bus / Reserve Seats Route (Using $addToSet) ---
 app.put('/api/buses/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+    const { bookedSeats, ...otherUpdates } = req.body;
+
+    // Checks if the id parameter is a valid MongoDB ObjectId or custom Number id
     const filter = mongoose.Types.ObjectId.isValid(id)
       ? { _id: id }
       : { id: Number(id) };
 
+    // Build dynamic update operator query
+    const updateQuery = {};
+
+    // 1. If bookedSeats is provided, safely push non-duplicate seats
+    if (bookedSeats && Array.isArray(bookedSeats)) {
+      updateQuery.$addToSet = { bookedSeats: { $each: bookedSeats } };
+    }
+
+    // 2. If additional bus details are being updated, set them
+    if (Object.keys(otherUpdates).length > 0) {
+      updateQuery.$set = otherUpdates;
+    }
+
     const updatedBus = await Bus.findOneAndUpdate(
       filter,
-      { $set: req.body },
+      updateQuery,
       { new: true, runValidators: true }
     );
 
     if (!updatedBus) {
       return res.status(404).json({ message: 'Bus route not found' });
     }
+
     res.status(200).json(updatedBus);
   } catch (error) {
     console.error('Bus update error:', error);
