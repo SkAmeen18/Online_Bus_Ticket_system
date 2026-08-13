@@ -1,34 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Bus,
-  Ticket, 
-  CreditCard, 
-  Clock, 
-  ArrowRight, 
-  X, 
-  CheckCircle2, 
-  User as UserIcon, 
-  Phone, 
-  Mail, 
-  MapPin,
-  ShieldCheck,
-  Award,
-  HelpCircle,
-  Info,
-  Edit3,
-  Check,
-  Lock,
-  Camera,
-  Receipt,
-  RefreshCw,
-  Calendar,
-  Sparkles,
-  DollarSign
+  Bus, Ticket, CreditCard, Clock, ArrowRight, X, CheckCircle2, User as UserIcon, 
+  Phone, Mail, MapPin, ShieldCheck, Award, Info, Edit3, Lock, Camera, Receipt, 
+  RefreshCw 
 } from 'lucide-react';
 
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5000/api'
-  : 'https://online-bus-ticket-system-81tt.onrender.com/api';
+const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
 
 const BANGLADESH_DISTRICTS = [
   'Select District', 'Bagerhat', 'Bandarban', 'Barguna', 'Barishal', 'Bhola', 'Bogra', 'Brahmanbaria', 'Chandpur', 
@@ -117,7 +94,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         setBuses(Array.isArray(liveBuses) ? liveBuses : []);
       }
     } catch (err) {
-      console.error('Error fetching buses:', err);
+      console.error('Error fetching buses from MongoDB:', err);
     } finally {
       setLoadingBuses(false);
     }
@@ -141,7 +118,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         setUserPaymentHistory(Array.isArray(tickets) ? tickets : []);
       }
     } catch (err) {
-      console.error('Error fetching ticket history:', err);
+      console.error('Error fetching ticket history from MongoDB:', err);
     }
   }, [currentUserData.email]);
 
@@ -214,7 +191,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         const updated = await res.json();
         setCurrentUserData((prev) => ({ ...prev, ...updated }));
         setIsEditingProfile(false);
-        alert('Profile updated successfully!');
+        alert('Profile updated successfully in MongoDB!');
       } else {
         alert('Failed to update profile on server.');
       }
@@ -249,7 +226,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       });
 
       if (res.ok) {
-        alert('Password updated successfully!');
+        alert('Password updated successfully in MongoDB!');
         setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
         setIsChangingPassword(false);
       } else {
@@ -305,8 +282,9 @@ export default function User({ activeTab = 'Home', user = {} }) {
       return;
     }
 
-    // Retrieve authentication token
     const token = localStorage.getItem('token');
+    
+    // Utilize MongoDB _id format as priority
     const busId = selectedBus._id || selectedBus.id;
     const existingBooked = selectedBus.bookedSeats || [];
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
@@ -323,7 +301,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       });
 
       if (!resBus.ok) {
-        throw new Error('Failed to update reserved seats on server.');
+        throw new Error('Failed to update reserved seats on MongoDB server.');
       }
 
       // 2. Save ticket transaction directly into MongoDB Atlas
@@ -360,7 +338,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       });
 
       if (resTicket.ok) {
-        // 3. Refresh live routes and user activity logs
+        // 3. Refresh live routes and user activity logs from DB
         fetchBuses();
         fetchUserTickets();
 
@@ -381,7 +359,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
           bookedSeats: updatedBookedSeats
         }));
       } else {
-        alert('Could not save booking details to database.');
+        alert('Could not save booking details to MongoDB database.');
       }
 
     } catch (err) {
@@ -450,7 +428,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
           {loadingBuses ? (
             <div style={styles.emptyCard}>
               <RefreshCw size={36} color="#3b82f6" />
-              <p style={{ color: '#a1a1aa', marginTop: '12px' }}>Loading routes from cloud database...</p>
+              <p style={{ color: '#a1a1aa', marginTop: '12px' }}>Loading routes from MongoDB database...</p>
             </div>
           ) : buses.length === 0 ? (
             <div style={styles.emptyCard}>
