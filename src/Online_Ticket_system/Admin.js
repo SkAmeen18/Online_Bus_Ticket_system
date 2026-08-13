@@ -1099,7 +1099,9 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                                 onClick={() => handleToggleSeatAdmin(seatId)}
                                 title={`Click to toggle seat ${seatId}`}
                               >
-                                {seatId}
+                                <span style={{ width: '100%', textAlign: 'center', display: 'block' }}>
+                                  {seatId}
+                                </span>
                               </button>
                             ))}
                           </div>
