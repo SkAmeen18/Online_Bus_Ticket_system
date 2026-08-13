@@ -294,7 +294,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
 
     try {
-      // 1. Reserve seats in MongoDB Atlas
+      // 1. Update reserved seats on MongoDB Atlas
       const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -305,9 +305,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
         throw new Error('Failed to update reserved seats on server.');
       }
 
-      // 2. Save ticket in MongoDB Atlas
+      // 2. Save ticket transaction directly into MongoDB Atlas
       const newTicketRecord = {
-        id: 'TICK-' + Math.floor(100000 + Math.random() * 900000),
         busId: busId,
         busName: selectedBus.name,
         from: selectedBus.from,
@@ -318,7 +317,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         passengerName: passenger.name,
         passengerPhone: passenger.phone,
         passengerEmail: passenger.email || currentUserData.email,
-        userEmail: currentUserData.email,
+        userEmail: currentUserData.email || passenger.email,
         paymentMethod: paymentMethod,
         trxId: 'TRX' + Math.floor(10000000 + Math.random() * 90000000),
         purchaseDate: new Date().toLocaleDateString('en-US', {
@@ -330,35 +329,40 @@ export default function User({ activeTab = 'Home', user = {} }) {
         })
       };
 
-      await fetch(`${API_BASE}/tickets`, {
+      const resTicket = await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTicketRecord)
       });
 
-      // 3. Refresh Data
-      fetchBuses();
-      fetchUserTickets();
+      if (resTicket.ok) {
+        // 3. Refresh live routes and user activity logs
+        fetchBuses();
+        fetchUserTickets();
 
-      setBookingSuccess({
-        busName: selectedBus.name,
-        busNumber: selectedBus.busNumber,
-        seats: [...selectedSeats],
-        totalPaid: totalAmount,
-        trxId: newTicketRecord.trxId,
-        paymentMethod,
-        passengerName: passenger.name
-      });
+        setBookingSuccess({
+          busName: selectedBus.name,
+          busNumber: selectedBus.busNumber,
+          seats: [...selectedSeats],
+          totalPaid: totalAmount,
+          trxId: newTicketRecord.trxId,
+          paymentMethod,
+          passengerName: passenger.name
+        });
 
-      setIsCheckoutOpen(false);
-      setSelectedSeats([]);
-      setSelectedBus((prev) => ({
-        ...prev,
-        bookedSeats: updatedBookedSeats
-      }));
+        setIsCheckoutOpen(false);
+        setSelectedSeats([]);
+        setSelectedBus((prev) => ({
+          ...prev,
+          bookedSeats: updatedBookedSeats
+        }));
+      } else {
+        alert('Could not save booking details to database.');
+      }
 
     } catch (err) {
-      alert('Transaction failed. Please check internet connection.');
+      console.error('Booking failed:', err);
+      alert('Transaction failed. Please check connection to database.');
     }
   };
 

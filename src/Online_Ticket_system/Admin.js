@@ -119,7 +119,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   });
   const [editMsg, setEditMsg] = useState({ type: '', text: '' });
 
-  // Fetch buses, registered users, and tickets live from backend database
+  // Fetch Buses, Registered Users, and Tickets live from MongoDB Atlas
   useEffect(() => {
     const fetchData = async () => {
       // 1. Fetch Buses
@@ -134,7 +134,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         console.warn('Backend unavailable, using cached bus data.');
       }
 
-      // 2. Fetch Live Registered Users from MongoDB
+      // 2. Fetch Live Registered Passengers from MongoDB
       try {
         const res = await fetch(`${API_BASE}/users`);
         if (res.ok) {
@@ -144,11 +144,9 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         }
       } catch (err) {
         console.warn('Backend user fetch failed, using local fallback.');
-        const loadedUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
-        setRegisteredUsers(loadedUsers);
       }
 
-      // 3. Fetch Tickets
+      // 3. Fetch Live Tickets directly from MongoDB
       try {
         const res = await fetch(`${API_BASE}/tickets`);
         if (res.ok) {
@@ -158,8 +156,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         }
       } catch (err) {
         console.warn('Backend ticket fetch failed, using local fallback.');
-        const loadedTickets = JSON.parse(localStorage.getItem('app_tickets') || '[]');
-        setTicketSales(loadedTickets);
       }
     };
 
@@ -1622,7 +1618,7 @@ const styles = {
     gap: '4px'
   },
   legendBox: {
-    width: '10px',
+    width: '100px',
     height: '10px',
     borderRadius: '2px'
   },

@@ -276,31 +276,40 @@ app.delete('/api/buses/:id', async (req, res) => {
   }
 });
 
-// Tickets Routes
-app.get('/api/tickets', async (req, res) => {
-  try {
-    const { email } = req.query;
-    let query = {};
-    if (email) {
-      query.$or = [
-        { userEmail: new RegExp(`^${email.trim()}$`, 'i') },
-        { passengerEmail: new RegExp(`^${email.trim()}$`, 'i') }
-      ];
-    }
-    const tickets = await Ticket.find(query).sort({ createdAt: -1 });
-    res.status(200).json(tickets);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch tickets' });
-  }
-});
-
+// 1. Save new ticket booking to MongoDB
 app.post('/api/tickets', async (req, res) => {
   try {
     const newTicket = new Ticket(req.body);
     await newTicket.save();
     res.status(201).json(newTicket);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to save ticket transaction' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Fetch all ticket bookings (for Admin / User History)
+app.get('/api/tickets', async (req, res) => {
+  try {
+    const { email } = req.query;
+    const query = email ? { passengerEmail: email } : {};
+    const tickets = await Ticket.find(query);
+    res.json(tickets);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Update bus bookedSeats array in MongoDB Atlas
+app.put('/api/buses/:id', async (req, res) => {
+  try {
+    const updatedBus = await Bus.findByIdAndUpdate(
+      req.params.id,
+      { bookedSeats: req.body.bookedSeats },
+      { new: true }
+    );
+    res.json(updatedBus);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
