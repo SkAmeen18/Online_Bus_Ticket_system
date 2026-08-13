@@ -48,11 +48,19 @@ export default function Signin({ onLoginSuccess }) {
   const handleRoleChange = (selectedRole) => {
     if (role !== selectedRole) {
       setRole(selectedRole);
+      // If switching to admin while in signup mode, force signin mode
+      if (selectedRole === 'admin' && mode === 'signup') {
+        setMode('signin');
+      }
       resetForm();
     }
   };
 
   const handleModeChange = (newMode) => {
+    // Prevent admins from accessing signup mode
+    if (newMode === 'signup' && role === 'admin') {
+      setRole('user');
+    }
     setMode(newMode);
     resetForm();
   };
@@ -91,6 +99,9 @@ export default function Signin({ onLoginSuccess }) {
     }
 
     if (mode === 'signup') {
+      // Force role to user during signup
+      const signupRole = 'user';
+
       if (!formData.name || !formData.emailOrPhone || !formData.password || !formData.confirmPassword) {
         setError('Please fill in all required registration fields.');
         return;
@@ -115,7 +126,7 @@ export default function Signin({ onLoginSuccess }) {
             email: formData.emailOrPhone,
             phone: formData.phone || formData.emailOrPhone,
             password: formData.password,
-            role: role,
+            role: signupRole,
           }),
         });
 
@@ -130,12 +141,12 @@ export default function Signin({ onLoginSuccess }) {
         }
 
         const newUser = data.user || {
-          id: (role === 'admin' ? 'ADM-' : 'USR-') + Math.floor(1000 + Math.random() * 9000),
+          id: 'USR-' + Math.floor(1000 + Math.random() * 9000),
           name: formData.name,
           email: formData.emailOrPhone,
           phone: formData.phone || '',
           password: formData.password,
-          role: role === 'admin' ? 'admin' : 'user',
+          role: 'user',
           joined: new Date().toISOString().split('T')[0],
           status: 'Active'
         };
@@ -143,17 +154,17 @@ export default function Signin({ onLoginSuccess }) {
         saveUserToLocalStorage(newUser);
         resetForm();
         setMode('signin');
-        setSuccessMsg(`${role === 'admin' ? 'Admin' : 'Passenger'} account created successfully! You can now sign in.`);
+        setSuccessMsg(`Passenger account created successfully! You can now sign in.`);
 
       } catch (err) {
         // Fallback local save if server fails or is offline
         const localUser = {
-          id: (role === 'admin' ? 'ADM-' : 'USR-') + Math.floor(1000 + Math.random() * 9000),
+          id: 'USR-' + Math.floor(1000 + Math.random() * 9000),
           name: formData.name,
           email: formData.emailOrPhone,
           phone: formData.phone || '',
           password: formData.password,
-          role: role === 'admin' ? 'admin' : 'user',
+          role: 'user',
           joined: new Date().toISOString().split('T')[0],
           status: 'Active'
         };
@@ -293,12 +304,12 @@ export default function Signin({ onLoginSuccess }) {
           <div style={styles.formHeader}>
             <h2 style={styles.formTitle}>
               {mode === 'forgot' && 'Reset Password'}
-              {mode === 'signup' && `Create ${role === 'admin' ? 'Admin' : 'Passenger'} Account`}
+              {mode === 'signup' && 'Create Passenger Account'}
               {mode === 'signin' && `${role === 'admin' ? 'Admin' : 'Passenger'} Sign In`}
             </h2>
             <p style={styles.formSubtext}>
               {mode === 'forgot' && 'Enter your registered Email/Mobile to receive reset instructions.'}
-              {mode === 'signup' && `Fill details below to register a new ${role === 'admin' ? 'Admin' : 'Passenger'} account.`}
+              {mode === 'signup' && 'Fill details below to register a new Passenger account.'}
               {mode === 'signin' && `Enter your ${role === 'admin' ? 'Admin credentials' : 'Mobile Number or Email'} to proceed.`}
             </p>
           </div>
@@ -315,7 +326,7 @@ export default function Signin({ onLoginSuccess }) {
                   <input
                     type="text"
                     name="name"
-                    placeholder={role === 'admin' ? "e.g. Admin User" : "e.g. Tanvir Hossain"}
+                    placeholder="e.g. Tanvir Hossain"
                     value={formData.name}
                     onChange={handleInputChange}
                     style={styles.input}
@@ -336,7 +347,7 @@ export default function Signin({ onLoginSuccess }) {
                   name="emailOrPhone"
                   placeholder={
                     mode === 'signup' 
-                      ? role === 'admin' ? 'admin@example.com' : 'passenger@example.com' 
+                      ? 'passenger@example.com' 
                       : role === 'admin' 
                         ? 'admin@gmail.com' 
                         : '017XXXXXXXX or user@gmail.com'
@@ -436,7 +447,7 @@ export default function Signin({ onLoginSuccess }) {
                   )}
                   {mode === 'signup' && (
                     <>
-                      <span>Register {role === 'admin' ? 'Admin' : 'Passenger'}</span> <ArrowRight size={18} />
+                      <span>Register Passenger</span> <ArrowRight size={18} />
                     </>
                   )}
                   {mode === 'signin' && (
@@ -449,8 +460,35 @@ export default function Signin({ onLoginSuccess }) {
             </button>
           </form>
 
-          <div style={styles.switchContainer}>
-            {mode === 'forgot' ? (
+          {/* Hide sign up toggle when in Admin mode */}
+          {role !== 'admin' && (
+            <div style={styles.switchContainer}>
+              {mode === 'forgot' ? (
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('signin')}
+                  style={styles.backBtn}
+                >
+                  <ArrowLeft size={16} /> Back to Sign In
+                </button>
+              ) : (
+                <>
+                  <span>{mode === 'signup' ? 'Already registered?' : "Don't have an account?"}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange(mode === 'signup' ? 'signin' : 'signup')}
+                    style={styles.switchBtn}
+                  >
+                    {mode === 'signup' ? 'Sign In' : 'Sign Up'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Direct back link for admin forgot password */}
+          {role === 'admin' && mode === 'forgot' && (
+            <div style={styles.switchContainer}>
               <button
                 type="button"
                 onClick={() => handleModeChange('signin')}
@@ -458,19 +496,8 @@ export default function Signin({ onLoginSuccess }) {
               >
                 <ArrowLeft size={16} /> Back to Sign In
               </button>
-            ) : (
-              <>
-                <span>{mode === 'signup' ? 'Already registered?' : "Don't have an account?"}</span>
-                <button
-                  type="button"
-                  onClick={() => handleModeChange(mode === 'signup' ? 'signin' : 'signup')}
-                  style={styles.switchBtn}
-                >
-                  {mode === 'signup' ? 'Sign In' : 'Sign Up'}
-                </button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
 
         </div>
       </div>
