@@ -1,26 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Bus, Ticket, CreditCard, Clock, ArrowRight, X, CheckCircle2, User as UserIcon, 
-  Phone, Mail, MapPin, ShieldCheck, Award, Info, Edit3, Lock, Camera, Receipt, 
-  RefreshCw 
+import {
+  Bus, Ticket, CreditCard, Clock, ArrowRight, X, CheckCircle2, User as UserIcon,
+  Phone, Mail, MapPin, ShieldCheck, Award, Info, Edit3, Lock, Camera, Receipt,
+  RefreshCw
 } from 'lucide-react';
 
 const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
 
 const BANGLADESH_DISTRICTS = [
-  'Select District', 'Bagerhat', 'Bandarban', 'Barguna', 'Barishal', 'Bhola', 'Bogra', 'Brahmanbaria', 'Chandpur', 
-  'Chittagong', 'Chuadanga', 'Comilla', 'Cox\'s Bazar', 'Dhaka', 'Dinajpur', 'Faridpur', 'Feni', 
-  'Gaibandha', 'Gazipur', 'Gopalganj', 'Habiganj', 'Jamalpur', 'Jessore', 'Jhalokati', 'Jhenaidah', 
-  'Joypurhat', 'Khagrachhari', 'Khulna', 'Kishoreganj', 'Kurigram', 'Kushtia', 'Lakshmipur', 'Lalmonirhat', 
-  'Madaripur', 'Magura', 'Manikganj', 'Meherpur', 'Moulvibazar', 'Munshiganj', 'Mymensingh', 'Naogaon', 
-  'Narail', 'Narayanganj', 'Narsingdi', 'Natore', 'Nawabganj', 'Netrokona', 'Nilphamari', 'Noakhali', 
-  'Pabna', 'Panchagarh', 'Patuakhali', 'Pirojpur', 'Rajbari', 'Rajshahi', 'Rangamati', 'Rangpur', 
+  'Select District', 'Bagerhat', 'Bandarban', 'Barguna', 'Barishal', 'Bhola', 'Bogra', 'Brahmanbaria', 'Chandpur',
+  'Chittagong', 'Chuadanga', 'Comilla', 'Cox\'s Bazar', 'Dhaka', 'Dinajpur', 'Faridpur', 'Feni',
+  'Gaibandha', 'Gazipur', 'Gopalganj', 'Habiganj', 'Jamalpur', 'Jessore', 'Jhalokati', 'Jhenaidah',
+  'Joypurhat', 'Khagrachhari', 'Khulna', 'Kishoreganj', 'Kurigram', 'Kushtia', 'Lakshmipur', 'Lalmonirhat',
+  'Madaripur', 'Magura', 'Manikganj', 'Meherpur', 'Moulvibazar', 'Munshiganj', 'Mymensingh', 'Naogaon',
+  'Narail', 'Narayanganj', 'Narsingdi', 'Natore', 'Nawabganj', 'Netrokona', 'Nilphamari', 'Noakhali',
+  'Pabna', 'Panchagarh', 'Patuakhali', 'Pirojpur', 'Rajbari', 'Rajshahi', 'Rangamati', 'Rangpur',
   'Satkhira', 'Shariatpur', 'Sherpur', 'Sirajganj', 'Sunamganj', 'Sylhet', 'Tangail', 'Thakurgaon'
 ];
 
 const formatTimeWithAmPm = (timeStr) => {
   if (!timeStr || timeStr === 'N/A') return 'N/A';
-  
+
   const cleanStr = timeStr.trim();
   if (/am|pm/i.test(cleanStr)) {
     return cleanStr;
@@ -44,7 +44,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
   const [loadingBuses, setLoadingBuses] = useState(true);
   const [searchFrom, setSearchFrom] = useState('Select District');
   const [searchTo, setSearchTo] = useState('Select District');
-  
+
   const [selectedBus, setSelectedBus] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -85,10 +85,10 @@ export default function User({ activeTab = 'Home', user = {} }) {
       let queryParams = [];
       if (searchFrom !== 'Select District') queryParams.push(`from=${encodeURIComponent(searchFrom)}`);
       if (searchTo !== 'Select District') queryParams.push(`to=${encodeURIComponent(searchTo)}`);
-      
+
       const queryString = queryParams.length ? `?${queryParams.join('&')}` : '';
       const res = await fetch(`${API_BASE}/buses${queryString}`);
-      
+
       if (res.ok) {
         const liveBuses = await res.json();
         setBuses(Array.isArray(liveBuses) ? liveBuses : []);
@@ -180,7 +180,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/users/profile`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
@@ -215,7 +215,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/users/profile`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
@@ -291,7 +291,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       // 1. UPDATE BUS SEATS IN MONGODB
       const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
@@ -328,7 +328,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
       const resTicket = await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
@@ -372,7 +372,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
   return (
     <div style={styles.container}>
-      
+
       {/* 1. HOME TAB */}
       {(currentTab === 'home') && (
         <>
@@ -385,8 +385,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
             <div style={styles.searchRow}>
               <div style={styles.searchField}>
                 <label style={styles.searchLabel}><MapPin size={14} color="#dadae0" /> From District</label>
-                <select 
-                  value={searchFrom} 
+                <select
+                  value={searchFrom}
                   onChange={(e) => setSearchFrom(e.target.value)}
                   style={styles.selectInput}
                 >
@@ -398,8 +398,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
               <div style={styles.searchField}>
                 <label style={styles.searchLabel}><MapPin size={14} color="#dadae0" /> To District</label>
-                <select 
-                  value={searchTo} 
+                <select
+                  value={searchTo}
                   onChange={(e) => setSearchTo(e.target.value)}
                   style={styles.selectInput}
                 >
@@ -409,8 +409,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 </select>
               </div>
 
-              <button 
-                style={styles.resetSearchBtn} 
+              <button
+                style={styles.resetSearchBtn}
                 onClick={() => { setSearchFrom('Select District'); setSearchTo('Select District'); }}
               >
                 Show All Routes
@@ -483,12 +483,12 @@ export default function User({ activeTab = 'Home', user = {} }) {
                           <div style={styles.fareValue}>{bus.fare}</div>
                         </div>
 
-                        <div style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span style={{ fontSize: '0.75rem', color: availableCount > 0 ? '#22c55e' : '#ef4444', fontWeight: '700' }}>
                             {availableCount > 0 ? `${availableCount} Seats Available` : 'Sold Out'}
                           </span>
-                          <button 
-                            style={styles.viewSeatsBtn}
+                          <button
+                            style={{ ...styles.viewSeatsBtn, marginTop: 0 }}
                             onClick={() => handleOpenBus(bus)}
                           >
                             View Seats <ArrowRight size={14} />
@@ -642,8 +642,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 </div>
               </div>
 
-              <button 
-                style={styles.editBtn} 
+              <button
+                style={styles.editBtn}
                 onClick={() => setIsEditingProfile(!isEditingProfile)}
               >
                 <Edit3 size={14} /> {isEditingProfile ? 'Cancel Edit' : 'Edit Profile'}
@@ -660,34 +660,34 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 <div style={styles.formTwoCol}>
                   <div style={styles.fieldGroup}>
                     <label style={styles.inputLabel}><UserIcon size={14} /> Full Name</label>
-                    <input 
-                      type="text" 
-                      value={editForm.name} 
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} 
-                      style={styles.textInput} 
-                      required 
+                    <input
+                      type="text"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      style={styles.textInput}
+                      required
                     />
                   </div>
 
                   <div style={styles.fieldGroup}>
                     <label style={styles.inputLabel}><Phone size={14} /> Phone Number</label>
-                    <input 
-                      type="text" 
-                      value={editForm.phone} 
-                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} 
-                      style={styles.textInput} 
-                      required 
+                    <input
+                      type="text"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      style={styles.textInput}
+                      required
                     />
                   </div>
                 </div>
 
                 <div style={styles.fieldGroup}>
                   <label style={styles.inputLabel}><Mail size={14} /> Email Address</label>
-                  <input 
-                    type="email" 
-                    value={editForm.email} 
-                    style={{ ...styles.textInput, backgroundColor: '#18181b', color: '#71717a' }} 
-                    disabled 
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    style={{ ...styles.textInput, backgroundColor: '#18181b', color: '#71717a' }}
+                    disabled
                   />
                 </div>
 
@@ -727,8 +727,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 <Lock size={18} color="#38bdf8" />
                 <span>Security & Password</span>
               </div>
-              <button 
-                style={styles.secondaryBtn} 
+              <button
+                style={styles.secondaryBtn}
                 onClick={() => setIsChangingPassword(!isChangingPassword)}
               >
                 {isChangingPassword ? 'Cancel' : 'Change Password'}
@@ -740,25 +740,25 @@ export default function User({ activeTab = 'Home', user = {} }) {
                 <div style={styles.formTwoCol}>
                   <div style={styles.fieldGroup}>
                     <label style={styles.inputLabel}>New Password</label>
-                    <input 
-                      type="password" 
-                      placeholder="••••••••" 
-                      value={passwordForm.newPassword} 
-                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} 
-                      style={styles.textInput} 
-                      required 
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                      style={styles.textInput}
+                      required
                     />
                   </div>
 
                   <div style={styles.fieldGroup}>
                     <label style={styles.inputLabel}>Confirm New Password</label>
-                    <input 
-                      type="password" 
-                      placeholder="••••••••" 
-                      value={passwordForm.confirmPassword} 
-                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} 
-                      style={styles.textInput} 
-                      required 
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                      style={styles.textInput}
+                      required
                     />
                   </div>
                 </div>
@@ -909,8 +909,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     </span>
                   </div>
 
-                  <button 
-                    style={{ ...styles.saveBtn, marginTop: '8px' }} 
+                  <button
+                    style={{ ...styles.saveBtn, marginTop: '8px' }}
                     onClick={handleProceedToPayment}
                   >
                     Proceed to Payment
@@ -1033,20 +1033,20 @@ const styles = {
   cardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '10px', borderTop: '1px solid #3f3f46' },
   fareLabel: { fontSize: '0.7rem', color: '#a1a1aa' },
   fareValue: { fontSize: '1.1rem', fontWeight: '800', color: '#22c55e' },
-  viewSeatsBtn: { 
-  display: 'inline-flex', 
-  alignItems: 'center', 
-  gap: '6px', 
-  padding: '8px 14px', 
-  borderRadius: '8px', 
-  border: 'none', 
-  backgroundColor: '#38bdf8', 
-  color: '#09090b', 
-  fontWeight: '700', 
-  fontSize: '0.82rem', 
-  cursor: 'pointer', 
-  marginTop: '12px'
-},
+  viewSeatsBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    border: 'none',
+    backgroundColor: '#38bdf8',
+    color: '#09090b',
+    fontWeight: '700',
+    fontSize: '0.82rem',
+    cursor: 'pointer',
+    marginTop: '12px'
+  },
   contentSection: { display: 'flex', flexDirection: 'column', gap: '20px' },
   aboutHeader: { backgroundColor: '#27272a', padding: '24px', borderRadius: '16px', border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', gap: '16px' },
   aboutBannerBox: { backgroundColor: '#18181b', padding: '18px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', gap: '12px', alignItems: 'center' },
@@ -1091,13 +1091,13 @@ const styles = {
   driverCabinRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px' },
   verticalSeatContainer: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' },
   busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  compactSeat: { 
-    width: '40px', 
-    height: '38px', 
-    borderRadius: '8px', 
-    border: 'none', 
-    color: '#ffffff', 
-    fontWeight: '700', 
+  compactSeat: {
+    width: '40px',
+    height: '38px',
+    borderRadius: '8px',
+    border: 'none',
+    color: '#ffffff',
+    fontWeight: '700',
     fontSize: '0.8rem',
     display: 'grid',
     placeItems: 'center',
