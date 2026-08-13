@@ -1023,34 +1023,37 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
             <div style={styles.modalTwoColumn}>
               <div style={styles.leftSeatColumn}>
-                <div style={styles.seatHeaderFlex}>
-                  <div>
-                    <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.95rem', fontWeight: '700' }}>
-                      Seat Plan
-                    </h4>
-                    <span style={{ fontSize: '0.78rem', color: '#a1a1aa' }}>
-                      ({selectedBusDetails.seats} Seats)
-                    </span>
+                
+                {/* Header Section */}
+                <div style={styles.headerStyle}>
+                  <div style={styles.titleRowStyle}>
+                    <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1rem', fontWeight: '600' }}>
+                      Seat Plan ({selectedBusDetails.seats} Seats)
+                    </h3>
+                    
+                    {/* Legend */}
+                    <div style={styles.legendContainerStyle}>
+                      <div style={styles.legendItemStyle}>
+                        <span style={styles.legendBadgeStyle('#22c55e')}></span>
+                        Free
+                      </div>
+                      <div style={styles.legendItemStyle}>
+                        <span style={styles.legendBadgeStyle('#64748b')}></span>
+                        Booked
+                      </div>
+                    </div>
                   </div>
 
-                  <div style={styles.legendRow}>
-                    <div style={styles.legendItem}>
-                      <div style={{ ...styles.legendBox, backgroundColor: '#22c55e' }} />
-                      <span>Free</span>
-                    </div>
-                    <div style={styles.legendItem}>
-                      <div style={{ ...styles.legendBox, backgroundColor: '#6b7280' }} />
-                      <span>Booked</span>
-                    </div>
-                  </div>
+                  <p style={{ margin: 0, fontSize: '0.78rem', fontStyle: 'italic', color: '#0ea5e9' }}>
+                    * Click any seat to toggle reservation status
+                  </p>
                 </div>
 
-                <div style={styles.adminNoteText}>* Click any seat to toggle reservation status</div>
-
                 <div style={styles.busChassis}>
-                  <div style={styles.driverCabinRow}>
-                    <span style={styles.driverIconBadge}>🚌 Driver</span>
-                    <div style={styles.steeringWheel}>⭕</div>
+                  {/* Driver Row */}
+                  <div style={styles.driverRowStyle}>
+                    <span>🚌 Driver</span>
+                    <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid #ef4444', borderRadius: '50%' }}></span>
                   </div>
 
                   <div style={styles.verticalSeatContainer}>
@@ -1072,7 +1075,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                                 type="button"
                                 style={{
                                   ...styles.compactSeat,
-                                  backgroundColor: isBooked(seatId) ? '#6b7280' : '#22c55e',
+                                  backgroundColor: isBooked(seatId) ? '#64748b' : '#22c55e',
                                 }}
                                 onClick={() => handleToggleSeatAdmin(seatId)}
                                 title={`Click to toggle seat ${seatId}`}
@@ -1091,7 +1094,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                                 type="button"
                                 style={{
                                   ...styles.compactSeat,
-                                  backgroundColor: isBooked(seatId) ? '#6b7280' : '#22c55e',
+                                  backgroundColor: isBooked(seatId) ? '#64748b' : '#22c55e',
                                 }}
                                 onClick={() => handleToggleSeatAdmin(seatId)}
                                 title={`Click to toggle seat ${seatId}`}
@@ -1592,35 +1595,52 @@ const styles = {
     display: 'flex',
     flexDirection: 'column'
   },
-  seatHeaderFlex: {
+  
+  /* Layout Styles */
+  headerStyle: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    marginBottom: '16px',
+    width: '100%'
+  },
+  titleRowStyle: {
     display: 'flex',
     justify: 'space-between',
     alignItems: 'center',
-    marginBottom: '8px'
+    flexWrap: 'wrap',
+    gap: '8px'
   },
-  adminNoteText: {
-    fontSize: '0.68rem',
-    color: '#38bdf8',
-    fontStyle: 'italic',
-    marginBottom: '12px'
-  },
-  legendRow: {
+  legendContainerStyle: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    fontSize: '0.75rem',
+    gap: '12px'
+  },
+  legendItemStyle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '0.8rem',
     color: '#a1a1aa'
   },
-  legendItem: {
+  legendBadgeStyle: (bgColor) => ({
+    width: '28px',
+    height: '8px',
+    borderRadius: '4px',
+    backgroundColor: bgColor
+  }),
+  driverRowStyle: {
+    width: '100%',
     display: 'flex',
+    justify: 'space-between',
     alignItems: 'center',
-    gap: '6px'
+    paddingBottom: '12px',
+    borderBottom: '1px dashed #27272a',
+    marginBottom: '16px',
+    color: '#a1a1aa',
+    fontSize: '0.85rem'
   },
-  legendBox: {
-    width: '14px',
-    height: '14px',
-    borderRadius: '4px'
-  },
+
   busChassis: {
     border: '2px solid #3f3f46',
     borderRadius: '20px 20px 10px 10px',
@@ -1631,27 +1651,6 @@ const styles = {
     alignItems: 'center',
     width: '100%',
     boxSizing: 'border-box'
-  },
-  driverCabinRow: {
-    width: '100%',
-    display: 'flex',
-    justify: 'space-between',
-    alignItems: 'center',
-    borderBottom: '1px dashed #3f3f46',
-    paddingBottom: '10px',
-    marginBottom: '14px'
-  },
-  driverIconBadge: {
-    fontSize: '0.8rem',
-    color: '#a1a1aa',
-    fontWeight: '600',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px'
-  },
-  steeringWheel: {
-    fontSize: '1.1rem',
-    lineHeight: '1'
   },
   verticalSeatContainer: {
     display: 'flex',
