@@ -364,6 +364,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
       alert(err.message || 'Transaction failed. Please check connection to database.');
     }
   };
+
   const currentTab = (activeTab || 'Home').toLowerCase();
 
   return (
@@ -784,188 +785,201 @@ export default function User({ activeTab = 'Home', user = {} }) {
       )}
 
       {/* SEAT SELECTION MODAL */}
-      {selectedBus && (
-        <div style={styles.modalOverlay} onClick={() => setSelectedBus(null)}>
-          <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div>
-                <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.2rem' }}>{selectedBus.name}</h3>
-                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
-                  Coach No: {selectedBus.busNumber || 'N/A'} | Route: {selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`}
-                </span>
-              </div>
-              <button style={styles.closeBtn} onClick={() => setSelectedBus(null)}><X size={20} /></button>
-            </div>
+      {selectedBus && (() => {
+        const busSeatCapacity = selectedBus.seats || 36;
+        const isLargeBus = busSeatCapacity >= 32;
 
-            {bookingSuccess ? (
-              <div style={styles.successReceiptCard}>
-                <CheckCircle2 size={48} color="#22c55e" />
-                <h3 style={{ margin: '8px 0 0 0', color: '#f4f4f5' }}>Booking Successful!</h3>
-                <p style={{ color: '#a1a1aa', fontSize: '0.9rem', margin: '4px 0 16px 0' }}>Your bus seats are reserved and confirmed.</p>
-
-                <div style={styles.receiptDetailsBox}>
-                  <div style={styles.receiptRow}><span>Operator:</span><strong>{bookingSuccess.busName}</strong></div>
-                  <div style={styles.receiptRow}><span>Coach Number:</span><strong>{bookingSuccess.busNumber}</strong></div>
-                  <div style={styles.receiptRow}><span>Passenger:</span><strong>{bookingSuccess.passengerName}</strong></div>
-                  <div style={styles.receiptRow}><span>Reserved Seats:</span><strong style={{ color: '#38bdf8' }}>{bookingSuccess.seats.join(', ')}</strong></div>
-                  <div style={styles.receiptRow}><span>Total Paid:</span><strong style={{ color: '#22c55e' }}>৳ {bookingSuccess.totalPaid}</strong></div>
-                  <div style={styles.receiptRow}><span>Transaction ID:</span><strong style={{ fontFamily: 'monospace' }}>{bookingSuccess.trxId}</strong></div>
+        return (
+          <div style={styles.modalOverlay} onClick={() => setSelectedBus(null)}>
+            <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.2rem' }}>{selectedBus.name}</h3>
+                  <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
+                    Coach No: {selectedBus.busNumber || 'N/A'} | Route: {selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`}
+                  </span>
                 </div>
-
-                <button style={styles.saveBtn} onClick={() => setSelectedBus(null)}>Done</button>
+                <button style={styles.closeBtn} onClick={() => setSelectedBus(null)}><X size={20} /></button>
               </div>
-            ) : (
-              <div style={styles.modalTwoColumn}>
-                <div style={styles.leftSeatColumn}>
-                  <div style={styles.seatHeaderFlex}>
-                    <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.85rem' }}>Select Seat(s)</h4>
-                    <div style={styles.legendRow}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ ...styles.legendBox, backgroundColor: '#22c55e' }}></span> Free
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ ...styles.legendBox, backgroundColor: '#38bdf8' }}></span> Selected
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ ...styles.legendBox, backgroundColor: '#52525b' }}></span> Booked
-                      </span>
+
+              {bookingSuccess ? (
+                <div style={styles.successReceiptCard}>
+                  <CheckCircle2 size={48} color="#22c55e" />
+                  <h3 style={{ margin: '8px 0 0 0', color: '#f4f4f5' }}>Booking Successful!</h3>
+                  <p style={{ color: '#a1a1aa', fontSize: '0.9rem', margin: '4px 0 16px 0' }}>Your bus seats are reserved and confirmed.</p>
+
+                  <div style={styles.receiptDetailsBox}>
+                    <div style={styles.receiptRow}><span>Operator:</span><strong>{bookingSuccess.busName}</strong></div>
+                    <div style={styles.receiptRow}><span>Coach Number:</span><strong>{bookingSuccess.busNumber}</strong></div>
+                    <div style={styles.receiptRow}><span>Passenger:</span><strong>{bookingSuccess.passengerName}</strong></div>
+                    <div style={styles.receiptRow}><span>Reserved Seats:</span><strong style={{ color: '#38bdf8' }}>{bookingSuccess.seats.join(', ')}</strong></div>
+                    <div style={styles.receiptRow}><span>Total Paid:</span><strong style={{ color: '#22c55e' }}>৳ {bookingSuccess.totalPaid}</strong></div>
+                    <div style={styles.receiptRow}><span>Transaction ID:</span><strong style={{ fontFamily: 'monospace' }}>{bookingSuccess.trxId}</strong></div>
+                  </div>
+
+                  <button style={styles.saveBtn} onClick={() => setSelectedBus(null)}>Done</button>
+                </div>
+              ) : (
+                <div style={styles.modalTwoColumn}>
+                  <div style={styles.leftSeatColumn}>
+                    <div style={styles.seatHeaderFlex}>
+                      <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.85rem' }}>Select Seat(s)</h4>
+                      <div style={styles.legendRow}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ ...styles.legendBox, backgroundColor: '#22c55e' }}></span> Free
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ ...styles.legendBox, backgroundColor: '#38bdf8' }}></span> Selected
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ ...styles.legendBox, backgroundColor: '#52525b' }}></span> Booked
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={styles.busChassis}>
+                      <div style={styles.driverCabinRow}>
+                        <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>🚌 Driver Cabin</span>
+                        <span>⭕</span>
+                      </div>
+
+                      <div
+                        className={isLargeBus ? "custom-scrollbar" : ""}
+                        style={{
+                          ...styles.verticalSeatContainer,
+                          maxHeight: isLargeBus ? '280px' : 'none',
+                          overflowY: isLargeBus ? 'auto' : 'visible',
+                          paddingRight: isLargeBus ? '4px' : '0'
+                        }}
+                      >
+                        {Array.from({ length: Math.ceil(busSeatCapacity / 4) }).map((_, rowIndex) => {
+                          const rowLetter = String.fromCharCode(65 + rowIndex);
+                          const seat1 = `${rowLetter}1`;
+                          const seat2 = `${rowLetter}2`;
+                          const seat3 = `${rowLetter}3`;
+                          const seat4 = `${rowLetter}4`;
+
+                          const isBooked = (sId) => (selectedBus.bookedSeats || []).includes(sId);
+                          const isSelected = (sId) => selectedSeats.includes(sId);
+
+                          return (
+                            <div key={rowLetter} style={styles.busRowGroup}>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                {[seat1, seat2].map((sId) => (
+                                  <button
+                                    key={sId}
+                                    type="button"
+                                    disabled={isBooked(sId)}
+                                    onClick={() => handleSeatClick(sId, isBooked(sId))}
+                                    style={{
+                                      ...styles.compactSeat,
+                                      backgroundColor: isBooked(sId) ? '#52525b' : isSelected(sId) ? '#38bdf8' : '#22c55e',
+                                      cursor: isBooked(sId) ? 'not-allowed' : 'pointer'
+                                    }}
+                                  >
+                                    {sId}
+                                  </button>
+                                ))}
+                              </div>
+
+                              <div style={{ flex: 1 }} />
+
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                {[seat3, seat4].map((sId) => (
+                                  <button
+                                    key={sId}
+                                    type="button"
+                                    disabled={isBooked(sId)}
+                                    onClick={() => handleSeatClick(sId, isBooked(sId))}
+                                    style={{
+                                      ...styles.compactSeat,
+                                      backgroundColor: isBooked(sId) ? '#52525b' : isSelected(sId) ? '#38bdf8' : '#22c55e',
+                                      cursor: isBooked(sId) ? 'not-allowed' : 'pointer'
+                                    }}
+                                  >
+                                    {sId}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
 
-                  <div style={styles.busChassis}>
-                    <div style={styles.driverCabinRow}>
-                      <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>🚌 Driver Cabin</span>
-                      <span>⭕</span>
-                    </div>
-
-                    <div style={styles.verticalSeatContainer}>
-                      {Array.from({ length: Math.ceil((selectedBus.seats || 36) / 4) }).map((_, rowIndex) => {
-                        const rowLetter = String.fromCharCode(65 + rowIndex);
-                        const seat1 = `${rowLetter}1`;
-                        const seat2 = `${rowLetter}2`;
-                        const seat3 = `${rowLetter}3`;
-                        const seat4 = `${rowLetter}4`;
-
-                        const isBooked = (sId) => (selectedBus.bookedSeats || []).includes(sId);
-                        const isSelected = (sId) => selectedSeats.includes(sId);
-
-                        return (
-                          <div key={rowLetter} style={styles.busRowGroup}>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              {[seat1, seat2].map((sId) => (
-                                <button
-                                  key={sId}
-                                  type="button"
-                                  disabled={isBooked(sId)}
-                                  onClick={() => handleSeatClick(sId, isBooked(sId))}
-                                  style={{
-                                    ...styles.compactSeat,
-                                    backgroundColor: isBooked(sId) ? '#52525b' : isSelected(sId) ? '#38bdf8' : '#22c55e',
-                                    cursor: isBooked(sId) ? 'not-allowed' : 'pointer'
-                                  }}
-                                >
-                                  {sId}
-                                </button>
-                              ))}
-                            </div>
-
-                            <div style={{ flex: 1 }} />
-
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              {[seat3, seat4].map((sId) => (
-                                <button
-                                  key={sId}
-                                  type="button"
-                                  disabled={isBooked(sId)}
-                                  onClick={() => handleSeatClick(sId, isBooked(sId))}
-                                  style={{
-                                    ...styles.compactSeat,
-                                    backgroundColor: isBooked(sId) ? '#52525b' : isSelected(sId) ? '#38bdf8' : '#22c55e',
-                                    cursor: isBooked(sId) ? 'not-allowed' : 'pointer'
-                                  }}
-                                >
-                                  {sId}
-                                </button>
-                              ))}
-                            </div>
+                  <div style={styles.rightInfoColumn}>
+                    {/* BUS IMAGE GALLERY */}
+                    {selectedBus.images && selectedBus.images.length > 0 ? (
+                      <div style={styles.galleryWrapper}>
+                        <img 
+                          src={selectedBus.images[activeImageIndex] || selectedBus.images[0]} 
+                          alt={`${selectedBus.name} Bus`} 
+                          style={styles.mainBusImage} 
+                        />
+                        {selectedBus.images.length > 1 && (
+                          <div style={styles.thumbnailRow}>
+                            {selectedBus.images.map((imgUrl, idx) => (
+                              <img
+                                key={idx}
+                                src={imgUrl}
+                                alt={`Bus view ${idx + 1}`}
+                                onClick={() => setActiveImageIndex(idx)}
+                                style={{
+                                  ...styles.thumbnail,
+                                  borderColor: activeImageIndex === idx ? '#38bdf8' : '#3f3f46'
+                                }}
+                              />
+                            ))}
                           </div>
-                        );
-                      })}
+                        )}
+                      </div>
+                    ) : (
+                      <div style={styles.noImagePlaceholder}>
+                        <Bus size={30} color="#71717a" />
+                        <span>No bus images available</span>
+                      </div>
+                    )}
+
+                    <div style={styles.detailCard}>
+                      <span style={styles.detailLabel}>Coach & Class</span>
+                      <span style={styles.detailValue}>{selectedBus.busType || 'Executive Class'}</span>
                     </div>
+
+                    <div style={styles.detailCard}>
+                      <span style={styles.detailLabel}>Departure & Arrival</span>
+                      <span style={styles.detailValue}>
+                        {formatTimeWithAmPm(selectedBus.departureTime)} ➔ {formatTimeWithAmPm(selectedBus.arrivalTime)}
+                      </span>
+                    </div>
+
+                    <div style={styles.detailCard}>
+                      <span style={styles.detailLabel}>Selected Seat Numbers</span>
+                      <span style={{ ...styles.detailValue, color: '#38bdf8' }}>
+                        {selectedSeats.length > 0 ? selectedSeats.join(', ') : 'None selected'}
+                      </span>
+                    </div>
+
+                    <div style={styles.detailCard}>
+                      <span style={styles.detailLabel}>Total Fare Payable</span>
+                      <span style={{ ...styles.detailValue, color: '#22c55e', fontSize: '1.1rem' }}>
+                        ৳ {totalAmount}
+                      </span>
+                    </div>
+
+                    <button
+                      style={{ ...styles.saveBtn, marginTop: 'auto' }}
+                      onClick={handleProceedToPayment}
+                    >
+                      Proceed to Payment
+                    </button>
                   </div>
                 </div>
-
-                <div style={styles.rightInfoColumn}>
-                  {/* BUS IMAGE GALLERY */}
-                  {selectedBus.images && selectedBus.images.length > 0 ? (
-                    <div style={styles.galleryWrapper}>
-                      <img 
-                        src={selectedBus.images[activeImageIndex] || selectedBus.images[0]} 
-                        alt={`${selectedBus.name} Bus`} 
-                        style={styles.mainBusImage} 
-                      />
-                      {selectedBus.images.length > 1 && (
-                        <div style={styles.thumbnailRow}>
-                          {selectedBus.images.map((imgUrl, idx) => (
-                            <img
-                              key={idx}
-                              src={imgUrl}
-                              alt={`Bus view ${idx + 1}`}
-                              onClick={() => setActiveImageIndex(idx)}
-                              style={{
-                                ...styles.thumbnail,
-                                borderColor: activeImageIndex === idx ? '#38bdf8' : '#3f3f46'
-                              }}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={styles.noImagePlaceholder}>
-                      <Bus size={30} color="#71717a" />
-                      <span>No bus images available</span>
-                    </div>
-                  )}
-
-                  <div style={styles.detailCard}>
-                    <span style={styles.detailLabel}>Coach & Class</span>
-                    <span style={styles.detailValue}>{selectedBus.busType || 'Executive Class'}</span>
-                  </div>
-
-                  <div style={styles.detailCard}>
-                    <span style={styles.detailLabel}>Departure & Arrival</span>
-                    <span style={styles.detailValue}>
-                      {formatTimeWithAmPm(selectedBus.departureTime)} ➔ {formatTimeWithAmPm(selectedBus.arrivalTime)}
-                    </span>
-                  </div>
-
-                  <div style={styles.detailCard}>
-                    <span style={styles.detailLabel}>Selected Seat Numbers</span>
-                    <span style={{ ...styles.detailValue, color: '#38bdf8' }}>
-                      {selectedSeats.length > 0 ? selectedSeats.join(', ') : 'None selected'}
-                    </span>
-                  </div>
-
-                  <div style={styles.detailCard}>
-                    <span style={styles.detailLabel}>Total Fare Payable</span>
-                    <span style={{ ...styles.detailValue, color: '#22c55e', fontSize: '1.1rem' }}>
-                      ৳ {totalAmount}
-                    </span>
-                  </div>
-
-                  <button
-                    style={{ ...styles.saveBtn, marginTop: 'auto' }}
-                    onClick={handleProceedToPayment}
-                  >
-                    Proceed to Payment
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* CHECKOUT & PAYMENT MODAL */}
       {isCheckoutOpen && (
@@ -1137,20 +1151,18 @@ const styles = {
   verticalSeatContainer: { 
     display: 'flex', 
     flexDirection: 'column', 
-    justifyContent: 'space-between',
-    flex: 1,
-    overflow: 'visible', 
+    gap: '8px',
     boxSizing: 'border-box'
   },
   busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   compactSeat: {
-    width: '32px',
-    height: '26px',
-    borderRadius: '5px',
+    width: '38px',
+    height: '32px',
+    borderRadius: '6px',
     border: 'none',
     color: '#ffffff',
     fontWeight: '700',
-    fontSize: '0.7rem',
+    fontSize: '0.78rem',
     display: 'grid',
     placeItems: 'center',
     placeContent: 'center',
@@ -1163,7 +1175,7 @@ const styles = {
     lineHeight: 1,
     userSelect: 'none',
     boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)',
-    transition: 'opacity 0.15s ease'
+    transition: 'transform 0.1s ease, opacity 0.15s ease'
   },
   rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', justifyContent: 'space-between' },
   detailCard: { backgroundColor: '#18181b', padding: '8px 10px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '2px' },
