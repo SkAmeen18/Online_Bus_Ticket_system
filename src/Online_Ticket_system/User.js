@@ -955,7 +955,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                   </div>
 
                   <button
-                    style={{ ...styles.saveBtn, marginTop: '4px' }}
+                    style={{ ...styles.saveBtn, marginTop: 'auto' }}
                     onClick={handleProceedToPayment}
                   >
                     Proceed to Payment
@@ -1124,22 +1124,22 @@ const styles = {
   secondaryBtn: { padding: '6px 12px', borderRadius: '6px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#38bdf8', fontSize: '0.8rem', cursor: 'pointer' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalContent: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%' },
-  modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '16px 20px', width: '90%', maxWidth: '820px', maxHeight: '95vh', overflow: 'hidden' },
+  modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '16px 20px', width: '90%', maxWidth: '820px', maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' },
   closeBtn: { background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer' },
-  modalTwoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', alignItems: 'start' },
-  leftSeatColumn: { backgroundColor: '#18181b', padding: '12px', borderRadius: '12px', border: '1px solid #3f3f46' },
+  modalTwoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', alignItems: 'stretch', flex: 1 },
+  leftSeatColumn: { backgroundColor: '#18181b', padding: '12px', borderRadius: '12px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', boxSizing: 'border-box' },
   seatHeaderFlex: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
   legendRow: { display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#a1a1aa' },
   legendBox: { width: '10px', height: '10px', borderRadius: '2px', display: 'inline-block' },
-  busChassis: { border: '2px solid #3f3f46', borderRadius: '12px', padding: '8px 10px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', gap: '6px' },
-  driverCabinRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #3f3f46', paddingBottom: '4px' },
+  busChassis: { border: '2px solid #3f3f46', borderRadius: '12px', padding: '12px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1 },
+  driverCabinRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #3f3f46', paddingBottom: '6px', marginBottom: '8px' },
   verticalSeatContainer: { 
     display: 'flex', 
     flexDirection: 'column', 
-    gap: '4px', 
+    justifyContent: 'space-between',
+    flex: 1,
     overflow: 'visible', 
-    paddingRight: '0px',
     boxSizing: 'border-box'
   },
   busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
@@ -1165,7 +1165,7 @@ const styles = {
     boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)',
     transition: 'opacity 0.15s ease'
   },
-  rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', justifyContent: 'space-between' },
   detailCard: { backgroundColor: '#18181b', padding: '8px 10px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '2px' },
   detailLabel: { fontSize: '0.7rem', color: '#a1a1aa' },
   detailValue: { fontSize: '0.85rem', color: '#f4f4f5', fontWeight: '700' },
