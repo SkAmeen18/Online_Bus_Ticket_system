@@ -86,7 +86,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     };
   });
 
-  // Zero default routes: Starts empty if nothing is cached
   const [buses, setBuses] = useState(() => {
     const savedBuses = localStorage.getItem('app_buses');
     return savedBuses ? JSON.parse(savedBuses) : [];
@@ -119,10 +118,8 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
   });
   const [editMsg, setEditMsg] = useState({ type: '', text: '' });
 
-  // Fetch Buses, Registered Users, and Tickets live from MongoDB Atlas
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Fetch Buses
       try {
         const res = await fetch(`${API_BASE}/buses`);
         if (res.ok) {
@@ -134,7 +131,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         console.warn('Backend unavailable, using cached bus data.');
       }
 
-      // 2. Fetch Live Registered Passengers from MongoDB
       try {
         const res = await fetch(`${API_BASE}/users`);
         if (res.ok) {
@@ -146,7 +142,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         console.warn('Backend user fetch failed, using local fallback.');
       }
 
-      // 3. Fetch Live Tickets directly from MongoDB
       try {
         const res = await fetch(`${API_BASE}/tickets`);
         if (res.ok) {
@@ -176,7 +171,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     }, 0);
   }, [ticketSales]);
 
-  // Filter out admin/staff accounts to display only real passenger sign-ups
   const realPassengers = useMemo(() => {
     return registeredUsers.filter((u) => {
       const isRoleAdmin = u.role === 'admin' || u.isAdmin === true;
@@ -187,7 +181,6 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     });
   }, [registeredUsers]);
 
-  // Search filtering over real passengers
   const filteredUsers = useMemo(() => {
     if (!userSearchTerm.trim()) return realPassengers;
     const term = userSearchTerm.toLowerCase();
@@ -1031,17 +1024,22 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
             <div style={styles.modalTwoColumn}>
               <div style={styles.leftSeatColumn}>
                 <div style={styles.seatHeaderFlex}>
-                  <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.95rem' }}>
-                    Seat Plan ({selectedBusDetails.seats} Seats)
-                  </h4>
+                  <div>
+                    <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.95rem', fontWeight: '700' }}>
+                      Seat Plan
+                    </h4>
+                    <span style={{ fontSize: '0.78rem', color: '#a1a1aa' }}>
+                      ({selectedBusDetails.seats} Seats)
+                    </span>
+                  </div>
 
                   <div style={styles.legendRow}>
                     <div style={styles.legendItem}>
-                      <div style={{ ...styles.legendBox, backgroundColor: '#22c55e' }}></div>
+                      <div style={{ ...styles.legendBox, backgroundColor: '#22c55e' }} />
                       <span>Free</span>
                     </div>
                     <div style={styles.legendItem}>
-                      <div style={{ ...styles.legendBox, backgroundColor: '#6b7280' }}></div>
+                      <div style={{ ...styles.legendBox, backgroundColor: '#6b7280' }} />
                       <span>Booked</span>
                     </div>
                   </div>
@@ -1598,7 +1596,7 @@ const styles = {
     display: 'flex',
     justify: 'space-between',
     alignItems: 'center',
-    marginBottom: '4px'
+    marginBottom: '8px'
   },
   adminNoteText: {
     fontSize: '0.68rem',
@@ -1608,19 +1606,20 @@ const styles = {
   },
   legendRow: {
     display: 'flex',
-    gap: '8px',
-    fontSize: '0.7rem',
+    alignItems: 'center',
+    gap: '12px',
+    fontSize: '0.75rem',
     color: '#a1a1aa'
   },
   legendItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px'
+    gap: '6px'
   },
   legendBox: {
-    width: '100px',
-    height: '10px',
-    borderRadius: '2px'
+    width: '14px',
+    height: '14px',
+    borderRadius: '4px'
   },
   busChassis: {
     border: '2px solid #3f3f46',
@@ -1639,16 +1638,20 @@ const styles = {
     justify: 'space-between',
     alignItems: 'center',
     borderBottom: '1px dashed #3f3f46',
-    paddingBottom: '8px',
-    marginBottom: '12px'
+    paddingBottom: '10px',
+    marginBottom: '14px'
   },
   driverIconBadge: {
-    fontSize: '0.75rem',
+    fontSize: '0.8rem',
     color: '#a1a1aa',
-    fontWeight: '600'
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px'
   },
   steeringWheel: {
-    fontSize: '0.9rem'
+    fontSize: '1.1rem',
+    lineHeight: '1'
   },
   verticalSeatContainer: {
     display: 'flex',
