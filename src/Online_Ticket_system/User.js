@@ -484,7 +484,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ fontSize: '0.75rem', color: availableCount > 0 ? '#22c55e' : '#ef4444', fontWeight: '700' }}>
+                          <span style={{ fontSize: '0.75rem', color: availableCount > 0 ? '#22c55e' : '#ef4444', fontWeight: '700', marginRight: '12px' }}>
                             {availableCount > 0 ? `${availableCount} Seats Available` : 'Sold Out'}
                           </span>
                           <button
