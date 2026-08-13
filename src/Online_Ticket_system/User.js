@@ -95,8 +95,9 @@ export default function User({ activeTab = 'Home', user = {} }) {
       }
     } catch (err) {
       console.error('Error fetching buses from MongoDB:', err);
-    } stroke:
+    } finally {
       setLoadingBuses(false);
+    }
   }, [searchFrom, searchTo]);
 
   // Fetch User's Ticket History from MongoDB
@@ -268,8 +269,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
     setIsCheckoutOpen(true);
   };
 
-  // UPDATED METHOD WITH FULL HEADERS AND AUTHENTICATION
-  // UPDATED METHOD WITH FULL API CALLS & ERROR HANDLING
   const handleConfirmBooking = async (e) => {
     e.preventDefault();
 
@@ -486,7 +485,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                         <div style={{ textAlign: 'right' }}>
                           <span style={{ fontSize: '0.75rem', color: availableCount > 0 ? '#22c55e' : '#ef4444', fontWeight: '700' }}>
-                            {availableCount > 0 ? `${availableCount} Seats Free` : 'Sold Out'}
+                            {availableCount > 0 ? `${availableCount} Seats Available` : 'Sold Out'}
                           </span>
                           <button 
                             style={styles.viewSeatsBtn}
@@ -1079,7 +1078,28 @@ const styles = {
   driverCabinRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px' },
   verticalSeatContainer: { display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' },
   busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  compactSeat: { width: '36px', height: '34px', borderRadius: '6px', border: 'none', color: '#ffffff', fontWeight: '700', fontSize: '0.75rem' },
+  compactSeat: { 
+    width: '40px', 
+    height: '38px', 
+    borderRadius: '8px', 
+    border: 'none', 
+    color: '#ffffff', 
+    fontWeight: '700', 
+    fontSize: '0.8rem',
+    display: 'grid',
+    placeItems: 'center',
+    placeContent: 'center',
+    textAlign: 'center',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    padding: 0,
+    margin: 0,
+    boxSizing: 'border-box',
+    lineHeight: 1,
+    userSelect: 'none',
+    boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)',
+    transition: 'opacity 0.15s ease'
+  },
   rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '10px' },
   detailCard: { backgroundColor: '#18181b', padding: '12px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '4px' },
   detailLabel: { fontSize: '0.72rem', color: '#a1a1aa' },
