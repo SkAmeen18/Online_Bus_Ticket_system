@@ -26,8 +26,8 @@ import {
   DollarSign
 } from 'lucide-react';
 
-const API_BASE = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000/api' 
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5000/api'
   : 'https://online-bus-ticket-system-81tt.onrender.com/api';
 
 const BANGLADESH_DISTRICTS = [
