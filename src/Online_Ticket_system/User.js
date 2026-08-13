@@ -789,8 +789,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
           <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <div>
-                <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.3rem' }}>{selectedBus.name}</h3>
-                <span style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>
+                <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.2rem' }}>{selectedBus.name}</h3>
+                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
                   Coach No: {selectedBus.busNumber || 'N/A'} | Route: {selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`}
                 </span>
               </div>
@@ -818,7 +818,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
               <div style={styles.modalTwoColumn}>
                 <div style={styles.leftSeatColumn}>
                   <div style={styles.seatHeaderFlex}>
-                    <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.9rem' }}>Select Seat(s)</h4>
+                    <h4 style={{ margin: 0, color: '#f4f4f5', fontSize: '0.85rem' }}>Select Seat(s)</h4>
                     <div style={styles.legendRow}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ ...styles.legendBox, backgroundColor: '#22c55e' }}></span> Free
@@ -838,7 +838,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                       <span>⭕</span>
                     </div>
 
-                    <div style={styles.verticalSeatContainer} className="custom-scrollbar">
+                    <div style={styles.verticalSeatContainer}>
                       {Array.from({ length: Math.ceil((selectedBus.seats || 36) / 4) }).map((_, rowIndex) => {
                         const rowLetter = String.fromCharCode(65 + rowIndex);
                         const seat1 = `${rowLetter}1`;
@@ -851,7 +851,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                         return (
                           <div key={rowLetter} style={styles.busRowGroup}>
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '6px' }}>
                               {[seat1, seat2].map((sId) => (
                                 <button
                                   key={sId}
@@ -871,7 +871,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                             <div style={{ flex: 1 }} />
 
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '6px' }}>
                               {[seat3, seat4].map((sId) => (
                                 <button
                                   key={sId}
@@ -923,7 +923,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     </div>
                   ) : (
                     <div style={styles.noImagePlaceholder}>
-                      <Bus size={36} color="#71717a" />
+                      <Bus size={30} color="#71717a" />
                       <span>No bus images available</span>
                     </div>
                   )}
@@ -949,13 +949,13 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
                   <div style={styles.detailCard}>
                     <span style={styles.detailLabel}>Total Fare Payable</span>
-                    <span style={{ ...styles.detailValue, color: '#22c55e', fontSize: '1.2rem' }}>
+                    <span style={{ ...styles.detailValue, color: '#22c55e', fontSize: '1.1rem' }}>
                       ৳ {totalAmount}
                     </span>
                   </div>
 
                   <button
-                    style={{ ...styles.saveBtn, marginTop: '8px' }}
+                    style={{ ...styles.saveBtn, marginTop: '4px' }}
                     onClick={handleProceedToPayment}
                   >
                     Proceed to Payment
@@ -1124,34 +1124,33 @@ const styles = {
   secondaryBtn: { padding: '6px 12px', borderRadius: '6px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#38bdf8', fontSize: '0.8rem', cursor: 'pointer' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalContent: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%' },
-  modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '24px', width: '90%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' },
+  modalContentLarge: { backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '16px', padding: '16px 20px', width: '90%', maxWidth: '820px', maxHeight: '95vh', overflow: 'hidden' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' },
   closeBtn: { background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer' },
-  modalTwoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', alignItems: 'start' },
-  leftSeatColumn: { backgroundColor: '#18181b', padding: '16px', borderRadius: '12px', border: '1px solid #3f3f46' },
-  seatHeaderFlex: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
+  modalTwoColumn: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', alignItems: 'start' },
+  leftSeatColumn: { backgroundColor: '#18181b', padding: '12px', borderRadius: '12px', border: '1px solid #3f3f46' },
+  seatHeaderFlex: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
   legendRow: { display: 'flex', gap: '8px', fontSize: '0.7rem', color: '#a1a1aa' },
   legendBox: { width: '10px', height: '10px', borderRadius: '2px', display: 'inline-block' },
-  busChassis: { border: '2px solid #3f3f46', borderRadius: '16px', padding: '14px 8px 14px 14px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', gap: '12px' },
-  driverCabinRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #3f3f46', paddingBottom: '8px', paddingRight: '12px' },
+  busChassis: { border: '2px solid #3f3f46', borderRadius: '12px', padding: '8px 10px', backgroundColor: '#09090b', display: 'flex', flexDirection: 'column', gap: '6px' },
+  driverCabinRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #3f3f46', paddingBottom: '4px' },
   verticalSeatContainer: { 
     display: 'flex', 
     flexDirection: 'column', 
-    gap: '10px', 
-    maxHeight: '380px', 
-    overflowY: 'auto', 
-    paddingRight: '12px',
+    gap: '4px', 
+    overflow: 'visible', 
+    paddingRight: '0px',
     boxSizing: 'border-box'
   },
   busRowGroup: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   compactSeat: {
-    width: '40px',
-    height: '38px',
-    borderRadius: '8px',
+    width: '32px',
+    height: '26px',
+    borderRadius: '5px',
     border: 'none',
     color: '#ffffff',
     fontWeight: '700',
-    fontSize: '0.8rem',
+    fontSize: '0.7rem',
     display: 'grid',
     placeItems: 'center',
     placeContent: 'center',
@@ -1166,10 +1165,10 @@ const styles = {
     boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2)',
     transition: 'opacity 0.15s ease'
   },
-  rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  detailCard: { backgroundColor: '#18181b', padding: '12px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '4px' },
-  detailLabel: { fontSize: '0.72rem', color: '#a1a1aa' },
-  detailValue: { fontSize: '0.9rem', color: '#f4f4f5', fontWeight: '700' },
+  rightInfoColumn: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  detailCard: { backgroundColor: '#18181b', padding: '8px 10px', borderRadius: '8px', border: '1px solid #3f3f46', display: 'flex', flexDirection: 'column', gap: '2px' },
+  detailLabel: { fontSize: '0.7rem', color: '#a1a1aa' },
+  detailValue: { fontSize: '0.85rem', color: '#f4f4f5', fontWeight: '700' },
   gatewayRadioGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' },
   gatewayBtn: { padding: '10px', borderRadius: '8px', border: '1px solid #3f3f46', color: '#f4f4f5', fontWeight: '700', cursor: 'pointer', fontSize: '0.85rem' },
   successReceiptCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px' },
@@ -1178,27 +1177,27 @@ const styles = {
   galleryWrapper: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '6px',
     backgroundColor: '#18181b',
-    padding: '8px',
-    borderRadius: '10px',
+    padding: '6px',
+    borderRadius: '8px',
     border: '1px solid #3f3f46'
   },
   mainBusImage: {
     width: '100%',
-    height: '140px',
+    height: '95px',
     objectFit: 'cover',
-    borderRadius: '8px'
+    borderRadius: '6px'
   },
   thumbnailRow: {
     display: 'flex',
-    gap: '6px',
+    gap: '4px',
     overflowX: 'auto',
     paddingBottom: '2px'
   },
   thumbnail: {
-    width: '45px',
-    height: '35px',
+    width: '40px',
+    height: '28px',
     objectFit: 'cover',
     borderRadius: '4px',
     border: '2px solid #3f3f46',
@@ -1207,14 +1206,14 @@ const styles = {
   noImagePlaceholder: {
     backgroundColor: '#18181b',
     border: '1px solid #3f3f46',
-    borderRadius: '10px',
-    height: '120px',
+    borderRadius: '8px',
+    height: '95px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#71717a',
-    gap: '6px',
-    fontSize: '0.8rem'
+    gap: '4px',
+    fontSize: '0.75rem'
   }
 };
