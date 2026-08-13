@@ -95,9 +95,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
       }
     } catch (err) {
       console.error('Error fetching buses from MongoDB:', err);
-    } finally {
+    } stroke:
       setLoadingBuses(false);
-    }
   }, [searchFrom, searchTo]);
 
   // Fetch User's Ticket History from MongoDB
@@ -269,6 +268,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
     setIsCheckoutOpen(true);
   };
 
+  // UPDATED METHOD WITH FULL HEADERS AND AUTHENTICATION
   const handleConfirmBooking = async (e) => {
     e.preventDefault();
 
@@ -284,13 +284,12 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
     const token = localStorage.getItem('token');
     
-    // Utilize MongoDB _id format as priority
     const busId = selectedBus._id || selectedBus.id;
     const existingBooked = selectedBus.bookedSeats || [];
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
 
     try {
-      // 1. Update reserved seats on MongoDB Atlas
+      // 1. Updates the bus document on MongoDB
       const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
         headers: { 
@@ -304,7 +303,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         throw new Error('Failed to update reserved seats on MongoDB server.');
       }
 
-      // 2. Save ticket transaction directly into MongoDB Atlas
+      // 2. Creates a permanent ticket entry in MongoDB
       const newTicketRecord = {
         busId: busId,
         busName: selectedBus.name,
@@ -338,7 +337,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
       });
 
       if (resTicket.ok) {
-        // 3. Refresh live routes and user activity logs from DB
         fetchBuses();
         fetchUserTickets();
 
