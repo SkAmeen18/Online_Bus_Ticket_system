@@ -129,7 +129,13 @@ export default function User({ activeTab = 'Home', user = {} }) {
     if (!userEmail) return;
 
     try {
-      const res = await fetch(`${API_BASE}/tickets?email=${encodeURIComponent(userEmail)}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/tickets?email=${encodeURIComponent(userEmail)}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
       if (res.ok) {
         const tickets = await res.json();
         setUserPaymentHistory(Array.isArray(tickets) ? tickets : []);
@@ -194,9 +200,13 @@ export default function User({ activeTab = 'Home', user = {} }) {
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/users/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(editForm)
       });
 
@@ -225,9 +235,13 @@ export default function User({ activeTab = 'Home', user = {} }) {
     }
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/users/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           email: currentUserData.email,
           newPassword: passwordForm.newPassword
@@ -291,6 +305,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
       return;
     }
 
+    // Retrieve authentication token
+    const token = localStorage.getItem('token');
     const busId = selectedBus._id || selectedBus.id;
     const existingBooked = selectedBus.bookedSeats || [];
     const updatedBookedSeats = [...existingBooked, ...selectedSeats];
@@ -299,7 +315,10 @@ export default function User({ activeTab = 'Home', user = {} }) {
       // 1. Update reserved seats on MongoDB Atlas
       const resBus = await fetch(`${API_BASE}/buses/${busId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ bookedSeats: updatedBookedSeats })
       });
 
@@ -333,7 +352,10 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
       const resTicket = await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(newTicketRecord)
       });
 
