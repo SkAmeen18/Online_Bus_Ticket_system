@@ -35,7 +35,9 @@ import {
   Search
 } from 'lucide-react';
 
-const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5000/api'
+  : 'https://online-bus-ticket-system-81tt.onrender.com/api';
 
 const BANGLADESH_DISTRICTS = [
   'Bagerhat', 'Bandarban', 'Barguna', 'Barishal', 'Bhola', 'Bogra', 'Brahmanbaria', 'Chandpur',
@@ -322,24 +324,31 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     setBuses((prev) => prev.filter((bus) => bus.id !== id && bus._id !== id));
   };
 
-  const handleToggleSeatAdmin = (seatId) => {
+  const handleToggleSeatAdmin = async (seatId) => {
     if (!selectedBusDetails) return;
 
     const currentBooked = selectedBusDetails.bookedSeats || [];
-    const isBooked = currentBooked.includes(seatId);
-
-    const updatedBooked = isBooked
+    const updatedBooked = currentBooked.includes(seatId)
       ? currentBooked.filter((s) => s !== seatId)
       : [...currentBooked, seatId];
 
-    const updatedBus = { ...selectedBusDetails, bookedSeats: updatedBooked };
+    const busId = selectedBusDetails._id || selectedBusDetails.id;
 
-    setSelectedBusDetails(updatedBus);
-    setBuses((prevBuses) =>
-      prevBuses.map((b) =>
-        (b._id || b.id) === (selectedBusDetails._id || selectedBusDetails.id) ? updatedBus : b
-      )
-    );
+    try {
+      const res = await fetch(`${API_BASE}/buses/${busId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookedSeats: updatedBooked })
+      });
+
+      if (res.ok) {
+        const updatedBus = await res.json();
+        setSelectedBusDetails(updatedBus);
+        setBuses((prev) => prev.map((b) => (b._id === updatedBus._id ? updatedBus : b)));
+      }
+    } catch (err) {
+      console.error('Failed to update seats in MongoDB:', err);
+    }
   };
 
   const handleExportUsersCSV = () => {
