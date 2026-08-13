@@ -1683,7 +1683,7 @@ const styles = {
     padding: 0,
     margin: 0,
     border: 'none',
-    lineHeight: 'normal',
+    lineHeight: '1',
     color: '#ffffff',
     fontSize: '0.8rem',
     fontWeight: '700',
