@@ -26,7 +26,9 @@ import {
   DollarSign
 } from 'lucide-react';
 
-const API_BASE = 'https://online-bus-ticket-system-81tt.onrender.com/api';
+const API_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000/api' 
+  : 'https://online-bus-ticket-system-81tt.onrender.com/api';
 
 const BANGLADESH_DISTRICTS = [
   'Select District', 'Bagerhat', 'Bandarban', 'Barguna', 'Barishal', 'Bhola', 'Bogra', 'Brahmanbaria', 'Chandpur', 
