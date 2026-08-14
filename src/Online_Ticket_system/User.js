@@ -953,9 +953,9 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     </div>
 
                     <div style={styles.detailCard}>
-                      <span style={styles.detailLabel}>Departure & Arrival</span>
+                      <span style={styles.detailLabel}>Arrival to Terminal Time & Departure Time</span>
                       <span style={styles.detailValue}>
-                        {formatTimeWithAmPm(selectedBus.departureTime)} ➔ {formatTimeWithAmPm(selectedBus.arrivalTime)}
+                        {formatTimeWithAmPm(selectedBus.departureTime)} ➔ {formatTimeWithAmPm(selectedBus.departureTime)}
                       </span>
                     </div>
 
@@ -1075,7 +1075,7 @@ const styles = {
   bannerSub: { margin: '4px 0 0 0', color: '#a1a1aa', fontSize: '0.85rem' },
   searchRow: { display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' },
   searchField: { flex: 1, minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '6px' },
-  searchLabel: { fontSize: '0.78rem', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' },
+  searchLabel: { fontSize: '0.78rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' },
   selectInput: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#ffffff', outline: 'none' },
   resetSearchBtn: { padding: '10px 16px', borderRadius: '8px', border: '1px solid #3f3f46', backgroundColor: '#18181b', color: '#a1a1aa', fontSize: '0.85rem', cursor: 'pointer' },
   sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
