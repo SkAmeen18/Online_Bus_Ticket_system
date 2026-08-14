@@ -370,7 +370,6 @@ export default function User({ activeTab = 'Home', user = {} }) {
 
   return (
     <div style={styles.container}>
-      {/* Dynamic Scrollbar Injection */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
@@ -484,7 +483,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                       <div style={styles.timeInfoRow}>
                         <div style={styles.timeBlock}>
                           <Clock size={13} color="#a1a1aa" />
-                          <span>Arrival: <strong>{formatTimeWithAmPm(bus.arrivalTime)}</strong></span>
+                          <span>Arrival to Terminal: <strong>{formatTimeWithAmPm(bus.arrivalTime)}</strong></span>
                         </div>
                         <div style={styles.timeBlock}>
                           <Clock size={13} color="#a1a1aa" />
