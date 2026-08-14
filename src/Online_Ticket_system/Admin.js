@@ -1244,9 +1244,9 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                     </div>
 
                     <div style={{ ...styles.detailCard, flex: 1 }}>
-                      <span style={styles.detailLabel}>Departure / Arrival</span>
+                      <span style={styles.detailLabel}>Arrival Time & Departure TIme</span>
                       <span style={styles.detailValue}>
-                        {selectedBusDetails.departureTime || 'N/A'} - {selectedBusDetails.arrivalTime || 'N/A'}
+                        {selectedBusDetails.arrivalTime || 'N/A'} - {selectedBusDetails.departureTime || 'N/A'}
                       </span>
                     </div>
                   </div>
