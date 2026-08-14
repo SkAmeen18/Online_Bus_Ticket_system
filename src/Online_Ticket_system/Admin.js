@@ -270,15 +270,19 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     e.preventDefault();
     setEditMsg({ type: '', text: '' });
 
+    // 1. Basic Required Fields Check
     if (!editFormData.name || !editFormData.email || !editFormData.phone) {
       setEditMsg({ type: 'error', text: 'Name, Email, and Phone are required.' });
       return;
     }
 
     let updatedPassword = adminProfile.password;
+    const isChangingPassword = Boolean(
+      editFormData.currentPassword || editFormData.newPassword || editFormData.confirmPassword
+    );
 
-    // PASSWORD CHANGE LOGIC
-    if (editFormData.currentPassword || editFormData.newPassword || editFormData.confirmPassword) {
+    // 2. Password Validation
+    if (isChangingPassword) {
       if (!editFormData.currentPassword) {
         setEditMsg({ type: 'error', text: 'Please enter your current password.' });
         return;
@@ -295,12 +299,12 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       }
 
       if (editFormData.newPassword.length < 6) {
-        setEditMsg({ type: 'error', text: 'New password must be at least 6 characters long.' });
+        setEditMsg({ type: 'error', text: 'Password must be at least 6 characters long.' });
         return;
       }
 
       if (editFormData.newPassword !== editFormData.confirmPassword) {
-        setEditMsg({ type: 'error', text: 'New passwords do not match!' });
+        setEditMsg({ type: 'error', text: 'New password and confirm password do not match!' });
         return;
       }
 
@@ -314,18 +318,40 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       password: updatedPassword
     };
 
+    // 3. Sync to MongoDB Backend API
     try {
-      if (user?.id || user?._id) {
-        await fetch(`${API_BASE}/users/${user.id || user._id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedProfile)
-        });
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+
+      // Make request to endpoint
+      const res = await fetch(`${API_BASE}/users/profile`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          ...updatedProfile,
+          newPassword: isChangingPassword ? editFormData.newPassword : undefined
+        })
+      });
+
+      if (!res.ok) {
+        // Fallback to ID-based PATCH if profile PUT isn't configured on backend
+        const userId = user?.id || user?._id;
+        if (userId) {
+          await fetch(`${API_BASE}/users/${userId}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify(updatedProfile)
+          });
+        }
       }
     } catch (err) {
-      console.warn('Could not sync password update to live server, saved locally.');
+      console.warn('Network error or server unavailable; saving profile updates locally.', err);
     }
 
+    // 4. Update Local State & Cache
     setAdminProfile(updatedProfile);
     localStorage.setItem('admin_profile_data', JSON.stringify(updatedProfile));
 
@@ -334,7 +360,16 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       localStorage.setItem(`avatar_${user?.emailOrPhone || 'admin'}`, editFormData.photo);
     }
 
+    // Reset password inputs on success
+    setEditFormData((prev) => ({
+      ...prev,
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    }));
+
     setEditMsg({ type: 'success', text: 'Profile & Password updated successfully!' });
+
     setTimeout(() => {
       setIsEditModalOpen(false);
     }, 1200);
