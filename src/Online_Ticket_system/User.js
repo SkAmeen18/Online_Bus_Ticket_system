@@ -955,7 +955,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     <div style={styles.detailCard}>
                       <span style={styles.detailLabel}>Arrival to Terminal Time & Departure Time</span>
                       <span style={styles.detailValue}>
-                        {formatTimeWithAmPm(selectedBus.departureTime)} ➔ {formatTimeWithAmPm(selectedBus.departureTime)}
+                        {formatTimeWithAmPm(selectedBus.arrivalTime)} ➔ {formatTimeWithAmPm(selectedBus.departureTime)}
                       </span>
                     </div>
 
