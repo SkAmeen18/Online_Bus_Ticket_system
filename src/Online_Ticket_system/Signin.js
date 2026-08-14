@@ -356,7 +356,7 @@ export default function Signin({ onLoginSuccess }) {
                       ? 'passenger@example.com' 
                       : role === 'admin' 
                         ? 'admin@gmail.com' 
-                        : '017XXXXXXXX or user@gmail.com'
+                        : 'number or user@gmail.com'
                   }
                   value={formData.emailOrPhone}
                   onChange={handleInputChange}
