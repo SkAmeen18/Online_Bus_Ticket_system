@@ -2,9 +2,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken'); // Added JWT
 require('dotenv').config();
 
 const app = express();
+
+// Secret key for JWT signing (uses .env or fallback)
+const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_super_secret_key';
 
 // --- CORS & Body Parsing Middleware ---
 app.use(cors({
@@ -78,7 +82,46 @@ const ticketSchema = new mongoose.Schema({
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
 
+// Helper function to generate JWT Token
+const generateToken = (id, role) => {
+  return jwt.sign({ id, role }, JWT_SECRET, { expiresIn: '7d' });
+};
+
 // --- 3. API Routes ---
+
+// NEW: Auth Verification Route (Runs on Page Reload)
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        joined: user.joined,
+        avatar: user.avatar
+      }
+    });
+  } catch (error) {
+    res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  }
+});
 
 // Sign Up Route
 app.post('/api/signup', async (req, res) => {
@@ -108,8 +151,12 @@ app.post('/api/signup', async (req, res) => {
 
     await newUser.save();
 
+    // Generate token
+    const token = generateToken(newUser._id, newUser.role);
+
     res.status(201).json({
       message: 'Account created successfully',
+      token,
       user: {
         id: newUser._id,
         _id: newUser._id,
@@ -149,8 +196,12 @@ app.post('/api/signin', async (req, res) => {
       return res.status(400).json({ message: 'Invalid email/phone or password.' });
     }
 
+    // Generate token
+    const token = generateToken(user._id, user.role);
+
     res.status(200).json({
       message: 'Sign in successful',
+      token,
       user: {
         id: user._id,
         _id: user._id,
@@ -251,26 +302,21 @@ app.post('/api/buses', async (req, res) => {
   }
 });
 
-// --- UPDATED: Update Bus / Reserve Seats Route (Using $addToSet) ---
 app.put('/api/buses/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { bookedSeats, ...otherUpdates } = req.body;
 
-    // Checks if the id parameter is a valid MongoDB ObjectId or custom Number id
     const filter = mongoose.Types.ObjectId.isValid(id)
       ? { _id: id }
       : { id: Number(id) };
 
-    // Build dynamic update operator query
     const updateQuery = {};
 
-    // 1. If bookedSeats is provided, safely push non-duplicate seats
     if (bookedSeats && Array.isArray(bookedSeats)) {
       updateQuery.$addToSet = { bookedSeats: { $each: bookedSeats } };
     }
 
-    // 2. If additional bus details are being updated, set them
     if (Object.keys(otherUpdates).length > 0) {
       updateQuery.$set = otherUpdates;
     }

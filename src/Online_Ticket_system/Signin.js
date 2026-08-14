@@ -203,9 +203,11 @@ export default function Signin({ onLoginSuccess }) {
         }
 
         let authenticatedUser = null;
+        let token = null;
 
         if (response.ok && data.user) {
           authenticatedUser = data.user;
+          token = data.token; // Save token from API
         } else {
           // Fallback to local storage lookup
           const localUsers = JSON.parse(localStorage.getItem('app_users') || '[]');
@@ -228,10 +230,14 @@ export default function Signin({ onLoginSuccess }) {
           throw new Error('Access denied. Admin accounts must sign in using the Admin Portal.');
         }
 
+        // Store active user session & JWT token
         localStorage.setItem('currentUser', JSON.stringify(authenticatedUser));
+        if (token) {
+          localStorage.setItem('token', token);
+        }
 
         if (onLoginSuccess) {
-          onLoginSuccess(authenticatedUser);
+          onLoginSuccess(authenticatedUser, token);
         }
       } catch (err) {
         setError(err.message || 'Login failed. Please check your credentials.');
