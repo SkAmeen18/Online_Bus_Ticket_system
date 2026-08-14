@@ -82,7 +82,8 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     return {
       name: user?.name || 'Admin User',
       email: user?.email || user?.emailOrPhone || 'admin@example.com',
-      phone: user?.phone || '+880 1700-000000'
+      phone: user?.phone || '+880 1700-000000',
+      password: user?.password || 'admin123'
     };
   });
 
@@ -265,7 +266,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveProfileChanges = (e) => {
+  const handleSaveProfileChanges = async (e) => {
     e.preventDefault();
     setEditMsg({ type: '', text: '' });
 
@@ -274,22 +275,56 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       return;
     }
 
-    if (editFormData.newPassword || editFormData.confirmPassword) {
+    let updatedPassword = adminProfile.password;
+
+    // PASSWORD CHANGE LOGIC
+    if (editFormData.currentPassword || editFormData.newPassword || editFormData.confirmPassword) {
+      if (!editFormData.currentPassword) {
+        setEditMsg({ type: 'error', text: 'Please enter your current password.' });
+        return;
+      }
+
+      if (adminProfile.password && editFormData.currentPassword !== adminProfile.password) {
+        setEditMsg({ type: 'error', text: 'Current password is incorrect!' });
+        return;
+      }
+
+      if (!editFormData.newPassword) {
+        setEditMsg({ type: 'error', text: 'Please enter a new password.' });
+        return;
+      }
+
+      if (editFormData.newPassword.length < 6) {
+        setEditMsg({ type: 'error', text: 'New password must be at least 6 characters long.' });
+        return;
+      }
+
       if (editFormData.newPassword !== editFormData.confirmPassword) {
         setEditMsg({ type: 'error', text: 'New passwords do not match!' });
         return;
       }
-      if (editFormData.newPassword.length < 6) {
-        setEditMsg({ type: 'error', text: 'Password must be at least 6 characters long.' });
-        return;
-      }
+
+      updatedPassword = editFormData.newPassword;
     }
 
     const updatedProfile = {
       name: editFormData.name,
       email: editFormData.email,
-      phone: editFormData.phone
+      phone: editFormData.phone,
+      password: updatedPassword
     };
+
+    try {
+      if (user?.id || user?._id) {
+        await fetch(`${API_BASE}/users/${user.id || user._id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedProfile)
+        });
+      }
+    } catch (err) {
+      console.warn('Could not sync password update to live server, saved locally.');
+    }
 
     setAdminProfile(updatedProfile);
     localStorage.setItem('admin_profile_data', JSON.stringify(updatedProfile));
@@ -299,7 +334,10 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
       localStorage.setItem(`avatar_${user?.emailOrPhone || 'admin'}`, editFormData.photo);
     }
 
-    setIsEditModalOpen(false);
+    setEditMsg({ type: 'success', text: 'Profile & Password updated successfully!' });
+    setTimeout(() => {
+      setIsEditModalOpen(false);
+    }, 1200);
   };
 
   const handleDeleteBus = async (e, id) => {
@@ -856,14 +894,14 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
         </div>
       )}
 
-      {/* EDIT ADMIN INFO MODAL */}
+      {/* EDIT ADMIN INFO MODAL WITH CHANGE PASSWORD SYSTEM */}
       {isEditModalOpen && (
         <div style={styles.modalOverlay}>
           <div style={{ ...styles.modalContent, maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={styles.modalHeader}>
               <div>
                 <h3 style={{ margin: 0, color: '#f4f4f5', fontSize: '1.25rem' }}>Personal Information</h3>
-                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Update personal details and admin photo</span>
+                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Update personal details, credentials, and profile photo</span>
               </div>
               <button style={styles.closeBtn} onClick={() => setIsEditModalOpen(false)}>
                 <X size={20} />
@@ -949,7 +987,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
 
               <div style={{ borderTop: '1px solid #3f3f46', paddingTop: '16px', marginTop: '8px' }}>
                 <h4 style={{ margin: '0 0 12px 0', color: '#f4f4f5', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Lock size={14} /> Change Password (Optional)
+                  <Lock size={14} /> Change Password System
                 </h4>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -957,7 +995,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                     <label style={styles.modalLabel}>Current Password</label>
                     <input
                       type="password"
-                      placeholder="••••••••"
+                      placeholder="Enter current password"
                       value={editFormData.currentPassword}
                       onChange={(e) => setEditFormData({ ...editFormData, currentPassword: e.target.value })}
                       style={styles.modalInput}
@@ -969,7 +1007,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                       <label style={styles.modalLabel}>New Password</label>
                       <input
                         type="password"
-                        placeholder="••••••••"
+                        placeholder="At least 6 characters"
                         value={editFormData.newPassword}
                         onChange={(e) => setEditFormData({ ...editFormData, newPassword: e.target.value })}
                         style={styles.modalInput}
@@ -980,7 +1018,7 @@ export default function Admin({ user = {}, activeTab = 'home' }) {
                       <label style={styles.modalLabel}>Confirm New Password</label>
                       <input
                         type="password"
-                        placeholder="••••••••"
+                        placeholder="Re-enter new password"
                         value={editFormData.confirmPassword}
                         onChange={(e) => setEditFormData({ ...editFormData, confirmPassword: e.target.value })}
                         style={styles.modalInput}
