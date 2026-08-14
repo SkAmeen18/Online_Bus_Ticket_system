@@ -100,7 +100,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
     }
   }, [searchFrom, searchTo]);
 
-  // Fetch User's Ticket History from MongoDB
+  // Fetch User's Specific Payment & Ticket History from MongoDB
   const fetchUserTickets = useCallback(async () => {
     const userEmail = currentUserData.email;
     if (!userEmail) return;
@@ -309,6 +309,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
         route: selectedBus.route || `${selectedBus.from} to ${selectedBus.to}`,
         seats: [...selectedSeats],
         fare: totalAmount,
+        price: totalAmount,
         passengerName: passenger.name,
         passengerPhone: passenger.phone,
         passengerEmail: passenger.email || currentUserData.email,
@@ -560,26 +561,30 @@ export default function User({ activeTab = 'Home', user = {} }) {
         </div>
       )}
 
-      {/* 3. TICKETS / HISTORY TAB */}
-      {(currentTab === 'tickets' || currentTab === 'history') && (
+      {/* 3. PAYMENT / TICKET HISTORY TAB */}
+      {(currentTab === 'payment' || currentTab === 'tickets' || currentTab === 'history') && (
         <div style={styles.contentSection}>
           <div style={styles.sectionHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Receipt size={24} color="#38bdf8" />
               <div>
-                <h3 style={styles.sectionTitle}>My Ticket History</h3>
-                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>All purchased bus tickets and transaction logs</span>
+                <h3 style={styles.sectionTitle}>Payment & Booking History</h3>
+                <span style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>
+                  Showing transaction logs for {currentUserData.email || 'your account'}
+                </span>
               </div>
             </div>
             <button style={styles.refreshBtn} onClick={fetchUserTickets}>
-              <RefreshCw size={12} /> Refresh History
+              <RefreshCw size={12} /> Refresh Payment History
             </button>
           </div>
 
           {userPaymentHistory.length === 0 ? (
             <div style={styles.emptyCard}>
-              <Ticket size={48} color="#71717a" />
-              <p style={{ color: '#a1a1aa', margin: '12px 0 0 0' }}>No ticket bookings recorded yet for this account.</p>
+              <CreditCard size={48} color="#71717a" />
+              <p style={{ color: '#a1a1aa', margin: '12px 0 0 0' }}>
+                No payment history or booked tickets found for this account in MongoDB.
+              </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -592,7 +597,9 @@ export default function User({ activeTab = 'Home', user = {} }) {
                         {t.busName || 'Express Bus Service'}
                       </span>
                     </div>
-                    <span style={styles.ticketStatusBadge}>Confirmed • Paid ৳ {t.fare || t.price || '0'}</span>
+                    <span style={styles.ticketStatusBadge}>
+                      Paid ৳ {t.fare || t.price || '0'}
+                    </span>
                   </div>
 
                   <div style={styles.ticketGrid}>
@@ -609,8 +616,8 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     </div>
 
                     <div>
-                      <span style={styles.ticketLabel}>Payment Method</span>
-                      <span style={styles.ticketValue}>{t.paymentMethod || 'bKash Direct'}</span>
+                      <span style={styles.ticketLabel}>Payment Gateway</span>
+                      <span style={styles.ticketValue}>{t.paymentMethod || 'bKash'}</span>
                     </div>
 
                     <div>
@@ -626,7 +633,7 @@ export default function User({ activeTab = 'Home', user = {} }) {
                     </div>
 
                     <div>
-                      <span style={styles.ticketLabel}>Booking Date</span>
+                      <span style={styles.ticketLabel}>Payment Date</span>
                       <span style={styles.ticketValue}>{t.purchaseDate || 'Recent'}</span>
                     </div>
                   </div>
